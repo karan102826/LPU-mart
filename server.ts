@@ -6,6 +6,7 @@ import dotenv from 'dotenv';
 import crypto from 'crypto';
 import { GoogleGenAI } from '@google/genai';
 import { supabaseServer, isSupabaseConfigured } from './src/lib/supabase/server';
+import { seedSupabaseIfEmpty } from './src/lib/supabase/seed';
 import {
   INITIAL_LISTINGS,
   INITIAL_ORDERS,
@@ -364,6 +365,28 @@ app.post('/api/listings', authenticateUser, (req, res) => {
   };
 
   dbListings.unshift(newListing);
+
+  if (isSupabaseConfigured) {
+    (async () => {
+      try {
+        const { error } = await supabaseServer.from('listings').insert({
+          title,
+          description,
+          category_id: category === 'Laptops' ? 'cat_laptops' : 'cat_electronics',
+          condition,
+          listing_type: listingType || 'both',
+          price_paise: Math.round(Number(price) * 100),
+          rental_rate_per_day_paise: rentalRatePerDay ? Math.round(Number(rentalRatePerDay) * 100) : null,
+          rental_deposit_paise: rentalDeposit ? Math.round(Number(rentalDeposit) * 100) : 0,
+          campus_location_id: campusLocationId || 'loc_unimall',
+          available: true,
+        });
+        if (error) console.warn('Supabase listing sync notice:', error.message);
+      } catch (err: any) {
+        console.warn('Supabase listing sync err:', err.message);
+      }
+    })();
+  }
 
   res.status(201).json({ message: 'Listing published successfully', listing: newListing });
 });
@@ -813,6 +836,14 @@ app.post('/api/ai/stream', async (req, res) => {
 // 9. VITE DEV SERVER / STATIC DIST SERVING
 // ==============================================================================
 async function startServer() {
+  if (isSupabaseConfigured) {
+    try {
+      await seedSupabaseIfEmpty();
+    } catch (e: any) {
+      console.warn('Initial seed error:', e.message);
+    }
+  }
+
   if (process.env.NODE_ENV === 'production') {
     app.use(express.static(path.resolve(__dirname, 'dist')));
     app.get('*', (_req, res) => {
