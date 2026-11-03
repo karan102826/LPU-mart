@@ -5,7 +5,9 @@ import { ProductCatalog } from './components/marketplace/ProductCatalog';
 import { SecurityLabView } from './components/security/SecurityLabView';
 import { HandshakeView } from './components/escrow/HandshakeView';
 import { AdminGovernanceView } from './components/admin/AdminGovernanceView';
+import { LoginPage } from './components/auth/LoginPage';
 import { AIAssistantModal } from './components/ai/AIAssistantModal';
+import { AdminLoginModal } from './components/auth/AdminLoginModal';
 import { Heart, ShieldCheck, Sparkles } from 'lucide-react';
 
 const MainContent: React.FC = () => {
@@ -22,10 +24,14 @@ const MainContent: React.FC = () => {
         {activeTab === 'security_lab' && <SecurityLabView />}
         {activeTab === 'handshake' && <HandshakeView />}
         {activeTab === 'admin' && <AdminGovernanceView />}
+        {activeTab === 'login' && <LoginPage />}
       </main>
 
       {/* Governed AI Assistant Dialog */}
       <AIAssistantModal />
+
+      {/* Dedicated Admin Login Modal */}
+      <AdminLoginModal />
 
       {/* Quiet, Polish Footer */}
       <footer className="border-t border-[#27272A] bg-[#09090B] py-8 px-4 md:px-8 text-xs text-[#A1A1AA] pb-20 lg:pb-8">

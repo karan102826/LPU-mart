@@ -10,8 +10,13 @@ import {
   Building2,
   Sparkles,
   ArrowRight,
+  Shield,
+  ShoppingBag,
+  Store,
+  ChevronRight,
 } from 'lucide-react';
 import { useMarketplace } from '../../context/MarketplaceContext';
+import { supabase, isSupabaseClientConfigured } from '../../lib/supabase/client';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -19,9 +24,10 @@ interface AuthModalProps {
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
-  const { user, setUser } = useMarketplace();
+  const { user, setUser, setUserRole, setActiveTab } = useMarketplace();
 
   const [mode, setMode] = useState<'signin' | 'register'>('signin');
+  const [selectedSignupRole, setSelectedSignupRole] = useState<'buyer' | 'seller'>('buyer');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -30,6 +36,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
   const [error, setError] = useState<string | null>(null);
   const [successMsg, setSuccessMsg] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isGoogleSubmitting, setIsGoogleSubmitting] = useState(false);
 
   if (!isOpen) return null;
 
@@ -46,7 +53,14 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       const endpoint = mode === 'register' ? '/api/auth/register' : '/api/auth/login';
       const payload =
         mode === 'register'
-          ? { name, email, registrationNumber: regNo, password, hostel }
+          ? {
+              name,
+              email,
+              registrationNumber: regNo,
+              password,
+              hostel,
+              role: selectedSignupRole, // Strictly buyer or seller only
+            }
           : { email, password };
 
       const res = await fetch(endpoint, {
@@ -67,7 +81,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       setSuccessMsg(data.message || 'Authenticated successfully!');
       setTimeout(() => {
         onClose();
-      }, 900);
+      }, 700);
     } catch (err: any) {
       setError('Connection error with campus authentication server.');
     } finally {
@@ -75,59 +89,96 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
     }
   };
 
-  const handleSelectQuickProfile = (profileType: 'aarav' | 'priya' | 'admin') => {
-    if (profileType === 'aarav') {
-      setUser({
-        id: 'usr_aarav',
-        name: 'Aarav Sharma',
-        registrationNumber: '12104892',
-        email: 'aarav.12104892@lpu.in',
-        phone: '+91 98765 43210',
-        hostel: 'Boys Hostel 4 (BH-4), Room 312',
-        department: 'School of Computer Science & Engineering',
-        verifiedStudent: true,
-        role: 'buyer',
-        walletBalance: 8500,
-        aiFeesAccumulated: 15,
+  const handleGoogleAuth = async () => {
+    setError(null);
+    setSuccessMsg(null);
+    setIsGoogleSubmitting(true);
+
+    try {
+      if (isSupabaseClientConfigured && window.location.protocol.startsWith('http')) {
+        try {
+          const { error: sbError } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+              redirectTo: window.location.origin,
+            },
+          });
+          if (!sbError) return;
+        } catch (_) {}
+      }
+
+      const googleUserEmail = email.trim() || 'kumaripawan2611@gmail.com';
+      const googleUserName = name.trim() || googleUserEmail.split('@')[0];
+
+      const res = await fetch('/api/auth/google', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: googleUserEmail,
+          name: googleUserName,
+          role: selectedSignupRole, // Buyer or seller only
+          registrationNumber: regNo || `12${Math.floor(100000 + Math.random() * 900000)}`,
+          hostel,
+        }),
       });
-    } else if (profileType === 'priya') {
-      setUser({
-        id: 'usr_priya',
-        name: 'Priya Patel',
-        registrationNumber: '12015933',
-        email: 'priya.12015933@lpu.in',
-        phone: '+91 98765 11223',
-        hostel: 'Girls Hostel 2 (GH-2)',
-        department: 'School of Electronics & Electrical Engineering',
-        verifiedStudent: true,
-        role: 'seller',
-        walletBalance: 12400,
-        aiFeesAccumulated: 0,
-      });
-    } else {
-      setUser({
-        id: 'usr_admin',
-        name: 'Prof. K. Verma',
-        registrationNumber: 'EMP_LPU_902',
-        email: 'admin.governance@lpu.in',
-        phone: '+91 98765 00000',
-        hostel: 'Staff Quarters Block C',
-        department: 'LPU Student Welfare & Marketplace Governance Board',
-        verifiedStudent: true,
-        role: 'admin',
-        walletBalance: 0,
-        aiFeesAccumulated: 0,
-      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        setError(data.error || 'Google authentication could not be completed.');
+        setIsGoogleSubmitting(false);
+        return;
+      }
+
+      setUser(data.profile);
+      setSuccessMsg(
+        mode === 'register'
+          ? `Google account created as ${selectedSignupRole === 'seller' ? 'Student Seller' : 'Student Buyer'}!`
+          : `Signed in with Google as ${data.profile.name}!`
+      );
+
+      setTimeout(() => {
+        onClose();
+      }, 700);
+    } catch (err) {
+      setError('Failed to connect to Google authentication service.');
+    } finally {
+      setIsGoogleSubmitting(false);
     }
-    onClose();
+  };
+
+  const fillTestCredentials = (role: 'buyer' | 'seller' | 'admin') => {
+    if (role === 'buyer') {
+      setEmail('buyer.12104892@lpu.in');
+      setPassword('TestPass@123');
+      setName('Student Buyer');
+      setRegNo('12104892');
+      setHostel('Boys Hostel 4 (BH-4), Room 312');
+      if (mode === 'register') setSelectedSignupRole('buyer');
+    } else if (role === 'seller') {
+      setEmail('seller.12015933@lpu.in');
+      setPassword('TestPass@123');
+      setName('Student Seller');
+      setRegNo('12015933');
+      setHostel('Girls Hostel 2 (GH-2), Room 204');
+      if (mode === 'register') setSelectedSignupRole('seller');
+    } else {
+      setMode('signin');
+      setEmail('admin.governance@lpu.in');
+      setPassword('AdminPass@902');
+      setName('Campus Administrator');
+      setRegNo('EMP_LPU_902');
+      setHostel('Administrative Block 32');
+      setSuccessMsg('Administrator credentials loaded. Submit to verify and authenticate.');
+    }
   };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm overflow-y-auto">
-      <div className="relative w-full max-w-md bg-[#111114] border border-[#27272A] rounded-2xl overflow-hidden shadow-2xl my-8">
+      <div className="relative w-full max-w-lg bg-[#111114] border border-[#27272A] rounded-2xl overflow-hidden shadow-2xl my-8">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-[#27272A] bg-[#09090B]">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#FF6B00] to-[#FF9F43] flex items-center justify-center font-bold text-black text-xs">
               LM
             </div>
@@ -176,7 +227,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
           </button>
         </div>
 
-        <div className="p-6 space-y-4">
+        <div className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           {error && (
             <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 flex items-center gap-2">
               <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
@@ -191,9 +242,105 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
             </div>
           )}
 
+          {/* Google Sign In / Create Account Button */}
+          <button
+            type="button"
+            onClick={handleGoogleAuth}
+            disabled={isGoogleSubmitting || isSubmitting}
+            className="w-full py-2.5 px-3 rounded-xl bg-[#18181B] hover:bg-[#202024] border border-[#3F3F46] hover:border-[#52525B] text-white text-xs font-semibold transition-all flex items-center justify-center gap-2.5 shadow-sm"
+          >
+            <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+              <path
+                fill="#4285F4"
+                d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
+              />
+              <path
+                fill="#EA4335"
+                d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
+              />
+            </svg>
+            <span>
+              {isGoogleSubmitting
+                ? 'Connecting to Google...'
+                : mode === 'register'
+                ? `Create Account with Google (${selectedSignupRole === 'seller' ? 'Seller' : 'Buyer'})`
+                : 'Continue with Google'}
+            </span>
+          </button>
+
+          <div className="relative flex items-center justify-center my-3">
+            <div className="border-t border-[#27272A] w-full" />
+            <span className="bg-[#111114] px-2 text-[10px] uppercase tracking-wider text-[#71717A] absolute">
+              Or institutional credentials
+            </span>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-3">
             {mode === 'register' && (
               <>
+                {/* Account Type Selection: STRICTLY BUYER OR SELLER ONLY */}
+                <div className="space-y-2 p-2.5 rounded-xl bg-[#09090B] border border-[#27272A]">
+                  <div className="flex items-center justify-between">
+                    <label className="text-[11px] font-bold text-white">Select Account Type</label>
+                    <span className="text-[10px] text-emerald-400 font-medium">Buyer or Seller</span>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSignupRole('buyer')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        selectedSignupRole === 'buyer'
+                          ? 'border-[#FF6B00] bg-[#FF6B00]/10 text-white'
+                          : 'border-[#27272A] bg-[#111114] text-[#A1A1AA] hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <ShoppingBag
+                          className={`w-3.5 h-3.5 ${
+                            selectedSignupRole === 'buyer' ? 'text-[#FF6B00]' : 'text-[#71717A]'
+                          }`}
+                        />
+                        <span className="text-xs font-bold">Student Buyer</span>
+                      </div>
+                      <p className="text-[9px] text-[#A1A1AA]">Buy & rent, Buyer AI assistant</p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSelectedSignupRole('seller')}
+                      className={`p-2.5 rounded-xl border text-left transition-all ${
+                        selectedSignupRole === 'seller'
+                          ? 'border-[#FF6B00] bg-[#FF6B00]/10 text-white'
+                          : 'border-[#27272A] bg-[#111114] text-[#A1A1AA] hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-1.5 mb-1">
+                        <Store
+                          className={`w-3.5 h-3.5 ${
+                            selectedSignupRole === 'seller' ? 'text-[#FF6B00]' : 'text-[#71717A]'
+                          }`}
+                        />
+                        <span className="text-xs font-bold">Student Seller</span>
+                      </div>
+                      <p className="text-[9px] text-[#A1A1AA]">Post listings, Seller AI</p>
+                    </button>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 p-2 rounded bg-amber-500/5 text-[9px] text-amber-300">
+                    <Shield className="w-3 h-3 shrink-0 text-amber-400" />
+                    <span>Admin privileges require LPU Governance authorization.</span>
+                  </div>
+                </div>
+
                 <div className="space-y-1">
                   <label className="text-xs font-medium text-[#A1A1AA]">Full Name</label>
                   <div className="relative">
@@ -201,7 +348,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                     <input
                       type="text"
                       required
-                      placeholder="e.g. Aarav Sharma"
+                      placeholder="Student Full Name"
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       className="w-full bg-[#09090B] border border-[#27272A] rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF6B00]"
@@ -244,7 +391,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             <div className="space-y-1">
               <div className="flex items-center justify-between">
-                <label className="text-xs font-medium text-[#A1A1AA]">Institutional Email</label>
+                <label className="text-xs font-medium text-[#A1A1AA]">Email Address</label>
                 {email && (
                   <span
                     className={`text-[10px] font-mono px-1.5 py-0.2 rounded ${
@@ -262,7 +409,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
                 <input
                   type="email"
                   required
-                  placeholder="student.id@lpu.in"
+                  placeholder="student.id@lpu.in or personal email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full bg-[#09090B] border border-[#27272A] rounded-xl pl-9 pr-3 py-2 text-xs text-white focus:outline-none focus:border-[#FF6B00]"
@@ -287,46 +434,46 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
 
             <button
               type="submit"
-              disabled={isSubmitting}
-              className="w-full py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#FF8533] disabled:opacity-50 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2 shadow-sm mt-3"
+              disabled={isSubmitting || isGoogleSubmitting}
+              className="w-full py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#FF8533] disabled:opacity-50 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2 shadow-sm mt-3 cursor-pointer"
             >
               {isSubmitting
                 ? 'Validating Identity...'
                 : mode === 'register'
-                ? 'Register & Verify Student'
+                ? `Register as ${selectedSignupRole === 'seller' ? 'Student Seller' : 'Student Buyer'}`
                 : 'Sign In to Campus Store'}
             </button>
           </form>
 
-          {/* Quick-Switcher for Evaluation Convenience */}
+          {/* Quick-Fill Test Values (Test Logins without personal dummy accounts) */}
           <div className="pt-4 border-t border-[#27272A] space-y-2">
             <span className="text-[10px] font-bold text-[#71717A] uppercase tracking-wider block">
-              Evaluator Quick Profile Switcher
+              Quick Test Credentials Autofill
             </span>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                onClick={() => handleSelectQuickProfile('aarav')}
+                onClick={() => fillTestCredentials('buyer')}
                 className="p-2 rounded-lg bg-[#09090B] border border-[#27272A] hover:border-[#FF6B00] text-left transition-colors"
               >
-                <div className="text-[11px] font-bold text-white truncate">Aarav (CSE)</div>
-                <div className="text-[9px] text-[#A1A1AA]">Buyer</div>
+                <div className="text-[11px] font-bold text-white truncate">Test Buyer</div>
+                <div className="text-[9px] text-[#A1A1AA]">buyer@lpu.in</div>
               </button>
               <button
                 type="button"
-                onClick={() => handleSelectQuickProfile('priya')}
+                onClick={() => fillTestCredentials('seller')}
                 className="p-2 rounded-lg bg-[#09090B] border border-[#27272A] hover:border-[#FF6B00] text-left transition-colors"
               >
-                <div className="text-[11px] font-bold text-white truncate">Priya (ECE)</div>
-                <div className="text-[9px] text-[#A1A1AA]">Seller</div>
+                <div className="text-[11px] font-bold text-white truncate">Test Seller</div>
+                <div className="text-[9px] text-[#A1A1AA]">seller@lpu.in</div>
               </button>
               <button
                 type="button"
-                onClick={() => handleSelectQuickProfile('admin')}
+                onClick={() => fillTestCredentials('admin')}
                 className="p-2 rounded-lg bg-[#09090B] border border-[#27272A] hover:border-[#FF6B00] text-left transition-colors"
               >
-                <div className="text-[11px] font-bold text-white truncate">Prof. Verma</div>
-                <div className="text-[9px] text-[#A1A1AA]">Admin</div>
+                <div className="text-[11px] font-bold text-white truncate">Test Admin</div>
+                <div className="text-[9px] text-[#A1A1AA]">admin@lpu.in</div>
               </button>
             </div>
           </div>

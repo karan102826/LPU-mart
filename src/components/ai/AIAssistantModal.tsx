@@ -38,21 +38,32 @@ export const AIAssistantModal: React.FC = () => {
 
   useEffect(() => {
     if (isAIModalOpen) {
-      // Check if general or item-specific
-      setFeeAccepted(false);
+      setFeeAccepted(user.role === 'admin'); // Admins bypass student item query fee
+      
+      let welcomeContent = '';
+      if (user.role === 'admin') {
+        welcomeContent = `Greetings Campus Administrator! I am LPUmart AI in Governance & Compliance Mode. I can assist you with real-time audit ledger inspection, PII breach summaries, dispute resolution policies, and Vridh Ashram social escrow tracking.`;
+      } else if (user.role === 'seller') {
+        welcomeContent = activeListingForAI
+          ? `Hello Student Seller! I can help you review your listing for "${activeListingForAI.title}", optimize pricing, verify that no personal contact numbers are leaked, and estimate your 90% payout after escrow.`
+          : `Hello Student Seller! I am LPUmart AI in Seller Mode. Ask me about campus pricing recommendations, drafting safe listing descriptions, rental deposit policies, or how to claim your escrow payouts.`;
+      } else {
+        welcomeContent = activeListingForAI
+          ? `Hello Student Buyer! I can answer questions about "${activeListingForAI.title}", check fair market value, explain the rental deposit, and help you plan a safe Uni-Mall handover.`
+          : `Hello Student Buyer! I am LPUmart AI in Buyer Mode. Ask me about verified campus listings, buy vs rent options, our 10% platform safety escrow, or our ₹2 donation to Vridh Ashram.`;
+      }
+
       setMessages([
         {
           id: 'welcome',
           sender: 'assistant',
-          content: activeListingForAI
-            ? `Hello ${user.name.split(' ')[0]}! I am LPUmart AI. I can answer questions about "${activeListingForAI.title}", explain condition, verify campus meeting locations (like Uni-Mall), and review rental policies. How can I help you?`
-            : `Hello ${user.name.split(' ')[0]}! I am LPUmart AI. Ask me about verified campus listings, buy vs rent options, our 10% platform safety escrow, or our ₹2 donation to Vridh Ashram.`,
+          content: welcomeContent,
           timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ]);
       setLastSanitizationAlert(null);
     }
-  }, [isAIModalOpen, activeListingForAI]);
+  }, [isAIModalOpen, activeListingForAI, user.role]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -304,32 +315,90 @@ export const AIAssistantModal: React.FC = () => {
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Suggested Quick Inquiries */}
+            {/* Suggested Quick Inquiries tailored to active role */}
             <div className="px-4 py-2 border-t border-[#27272A] bg-[#09090B] flex gap-2 overflow-x-auto scrollbar-none">
-              <button
-                onClick={() =>
-                  handleSendMessage('What is the item condition and what lab accessories are included?')
-                }
-                className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
-              >
-                Item condition & accessories
-              </button>
-              <button
-                onClick={() =>
-                  handleSendMessage('Where is the campus handshake point? Can we meet at Uni-Mall?')
-                }
-                className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
-              >
-                Campus meeting points
-              </button>
-              <button
-                onClick={() =>
-                  handleSendMessage('What are the rental rates and security deposit terms?')
-                }
-                className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
-              >
-                Rental terms & deposit
-              </button>
+              {user.role === 'admin' ? (
+                <>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('Summarize recent PII deflection events and security flags.')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#FF9F43] whitespace-nowrap"
+                  >
+                    Audit Security Flags
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('Explain the dispute mediation procedure for unverified handshakes.')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
+                  >
+                    Dispute Guidelines
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('How is the ₹2 Vridh Ashram social contribution calculated and audited?')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
+                  >
+                    Vridh Ashram Ledger
+                  </button>
+                </>
+              ) : user.role === 'seller' ? (
+                <>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('How should I price my used laptop or electronics competitively for campus?')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#FF9F43] whitespace-nowrap"
+                  >
+                    Pricing Recommendation
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('Help me write a clear, compliant description without leaking my phone or room number.')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
+                  >
+                    Listing Description Help
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('When do I receive my 90% payout after the Uni-Mall QR handshake is confirmed?')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
+                  >
+                    Escrow Payout Timeline
+                  </button>
+                </>
+              ) : (
+                <>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('What is the item condition and what lab accessories are included?')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
+                  >
+                    Item condition & specs
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('Where is the campus handshake point? Can we meet at Uni-Mall?')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
+                  >
+                    Campus meeting points
+                  </button>
+                  <button
+                    onClick={() =>
+                      handleSendMessage('What are the rental rates and security deposit terms?')
+                    }
+                    className="px-2.5 py-1 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[11px] text-[#A1A1AA] whitespace-nowrap"
+                  >
+                    Rental terms & deposit
+                  </button>
+                </>
+              )}
             </div>
 
             {/* Input Bar */}

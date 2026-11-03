@@ -31,45 +31,34 @@ app.use(express.json());
 
 // In-Memory Database Store (mirrors Supabase PostgreSQL relational schema for high performance)
 let dbProfiles = [
-  { ...INITIAL_USER, passwordHash: 'pbkdf2_demo_hash_aarav' },
   {
-    id: 'usr_priya',
-    name: 'Priya Patel',
+    ...INITIAL_USER,
+    passwordHash: 'pbkdf2_demo_hash_buyer',
+  },
+  {
+    id: 'usr_student_seller',
+    name: 'Student Seller',
     registrationNumber: '12015933',
-    email: 'priya.12015933@lpu.in',
-    phone: '+91 98765 11223',
+    email: 'seller.12015933@lpu.in',
+    phone: '+91 98765 00002',
     hostel: 'Girls Hostel 2 (GH-2)',
     department: 'School of Electronics & Electrical Engineering',
     verifiedStudent: true,
-    role: 'seller',
+    role: 'seller' as const,
     walletBalance: 12400,
     aiFeesAccumulated: 0,
-    passwordHash: 'pbkdf2_demo_hash_priya',
-  },
-  {
-    id: 'usr_rohan',
-    name: 'Rohan Verma',
-    registrationNumber: '12209148',
-    email: 'rohan.12209148@lpu.in',
-    phone: '+91 98765 44556',
-    hostel: 'Boys Hostel 3 (BH-3)',
-    department: 'Mittal School of Business (MBA)',
-    verifiedStudent: true,
-    role: 'seller',
-    walletBalance: 4500,
-    aiFeesAccumulated: 0,
-    passwordHash: 'pbkdf2_demo_hash_rohan',
+    passwordHash: 'pbkdf2_demo_hash_seller',
   },
   {
     id: 'usr_admin',
-    name: 'Prof. K. Verma',
+    name: 'Campus Administrator',
     registrationNumber: 'EMP_LPU_902',
     email: 'admin.governance@lpu.in',
     phone: '+91 98765 00000',
-    hostel: 'Staff Quarters Block C',
+    hostel: 'Administrative Block 32',
     department: 'LPU Student Welfare & Marketplace Governance Board',
     verifiedStudent: true,
-    role: 'admin',
+    role: 'admin' as const,
     walletBalance: 0,
     aiFeesAccumulated: 0,
     passwordHash: 'pbkdf2_demo_hash_admin',
@@ -197,13 +186,22 @@ app.get('/api/health', (req, res) => {
 // 2. AUTHENTICATION & CAMPUS IDENTITY ROUTES
 // ==============================================================================
 
-// Register Student
+// Register Student (Only Buyer or Seller permitted; Admin registration strictly forbidden)
 app.post('/api/auth/register', (req, res) => {
-  const { name, email, registrationNumber, password, hostel, department } = req.body;
+  const { name, email, registrationNumber, password, hostel, department, role } = req.body;
 
   if (!name || !email || !registrationNumber) {
     return res.status(400).json({ error: 'Name, email, and registration number are required.' });
   }
+
+  // Role Restriction: Admin role can NEVER be self-registered
+  if (role === 'admin') {
+    return res.status(403).json({
+      error: 'Access Denied: Administrator accounts cannot be self-registered. Admin privileges are provisioned exclusively by the LPU Governance Board.',
+    });
+  }
+
+  const assignedRole: 'buyer' | 'seller' = role === 'seller' ? 'seller' : 'buyer';
 
   // Institutional Verification Validation (§3)
   const isLpuEmail = email.toLowerCase().endsWith('@lpu.in') || email.toLowerCase().endsWith('@lpu.co.in');
@@ -222,11 +220,11 @@ app.post('/api/auth/register', (req, res) => {
     email,
     registrationNumber,
     phone: '',
-    hostel: hostel || 'Hostel Not Specified',
+    hostel: hostel || 'Campus Hostel',
     department: department || 'School of Computer Science & Engineering',
     verifiedStudent: isLpuEmail, // Auto-verified if genuine @lpu.in email
-    role: 'buyer' as const, // Never allow self-granting admin!
-    walletBalance: 1000,
+    role: assignedRole,
+    walletBalance: assignedRole === 'seller' ? 2500 : 1000,
     aiFeesAccumulated: 0,
     passwordHash: crypto.createHash('sha256').update(password || 'default_pass').digest('hex'),
   };
@@ -235,14 +233,69 @@ app.post('/api/auth/register', (req, res) => {
 
   res.status(201).json({
     message: isLpuEmail
-      ? 'Registration successful! Institutional LPU email verified.'
-      : 'Registration successful! Student verification is pending ID review.',
+      ? `Registration successful! Verified ${assignedRole === 'seller' ? 'Student Seller' : 'Student Buyer'} account created.`
+      : `Registration successful! Account created as ${assignedRole}. Verification is pending ID review.`,
     profile: newProfile,
     token: newProfile.id,
   });
 });
 
-// Login Student
+// Google Authentication & Account Creation
+app.post('/api/auth/google', (req, res) => {
+  const { email, name, role, registrationNumber, hostel, googleId } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ error: 'Google email address is required.' });
+  }
+
+  // Prevent self-registering as admin via Google
+  if (role === 'admin') {
+    return res.status(403).json({
+      error: 'Access Denied: Admin accounts cannot be created via Google sign up. Admin privileges require governance board authorization.',
+    });
+  }
+
+  // Check if existing student profile exists
+  let profile = dbProfiles.find((u) => u.email.toLowerCase() === email.toLowerCase());
+
+  if (profile) {
+    return res.json({
+      message: `Welcome back via Google, ${profile.name}!`,
+      profile,
+      token: profile.id,
+    });
+  }
+
+  // Create new profile via Google
+  const assignedRole: 'buyer' | 'seller' = role === 'seller' ? 'seller' : 'buyer';
+  const isLpuEmail = email.toLowerCase().endsWith('@lpu.in') || email.toLowerCase().endsWith('@lpu.co.in');
+  const generatedReg = registrationNumber || `12${Math.floor(100000 + Math.random() * 900000)}`;
+
+  const newProfile = {
+    id: `usr_google_${Date.now()}`,
+    name: name || email.split('@')[0],
+    email,
+    registrationNumber: generatedReg,
+    phone: '',
+    hostel: hostel || 'Hostel Not Specified',
+    department: 'Lovely Professional University',
+    verifiedStudent: true, // Google authenticated identity
+    role: assignedRole,
+    walletBalance: assignedRole === 'seller' ? 5000 : 2000,
+    aiFeesAccumulated: 0,
+    passwordHash: 'google_oauth_verified',
+  };
+
+  dbProfiles.push(newProfile);
+
+  res.status(201).json({
+    message: `Google Account registered successfully as ${assignedRole === 'seller' ? 'Student Seller' : 'Student Buyer'}!`,
+    profile: newProfile,
+    token: newProfile.id,
+  });
+});
+
+// Login Student (Supports Institutional, Google, and Test Credentials)
 app.post('/api/auth/login', (req, res) => {
   const { email, password } = req.body;
 
@@ -250,15 +303,67 @@ app.post('/api/auth/login', (req, res) => {
     return res.status(400).json({ error: 'Email is required' });
   }
 
-  const profile = dbProfiles.find((u) => u.email.toLowerCase() === email.toLowerCase());
+  const cleanEmail = email.toLowerCase().trim();
+
+  // Test credentials shortcuts
+  let profile = dbProfiles.find((u) => u.email.toLowerCase() === cleanEmail);
+
+  if (!profile) {
+    if (cleanEmail === 'buyer@lpu.in') {
+      profile = dbProfiles.find((u) => u.role === 'buyer') || dbProfiles[0];
+    } else if (cleanEmail === 'seller@lpu.in') {
+      profile = dbProfiles.find((u) => u.role === 'seller');
+    } else if (cleanEmail === 'admin@lpu.in') {
+      profile = dbProfiles.find((u) => u.role === 'admin');
+    }
+  }
+
   if (!profile) {
     return res.status(401).json({ error: 'Invalid credentials or student account not found.' });
   }
 
+  // Admin password enforcement: Admin accounts require valid credentials
+  if (profile.role === 'admin') {
+    const validAdminPasswords = ['AdminPass@902', 'Admin@LPU2026', 'LPU-ADMIN-2026', 'TestPass@123'];
+    if (!password || !validAdminPasswords.includes(password.trim())) {
+      return res.status(401).json({
+        error: 'Invalid administrator password. Administrator access requires institutional authentication.',
+      });
+    }
+  }
+
   res.json({
-    message: 'Welcome back to LPUmart!',
+    message: profile.role === 'admin' ? 'Administrator authenticated successfully!' : 'Welcome back to LPUmart!',
     profile,
     token: profile.id,
+  });
+});
+
+// Dedicated Administrator Authentication Gateway
+app.post('/api/auth/admin-login', (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) {
+    return res.status(400).json({ error: 'Administrator email and password are required.' });
+  }
+
+  const cleanEmail = email.toLowerCase().trim();
+  const isAdminEmail = cleanEmail === 'admin.governance@lpu.in' || cleanEmail === 'admin@lpu.in';
+  const validAdminPasswords = ['AdminPass@902', 'Admin@LPU2026', 'LPU-ADMIN-2026', 'TestPass@123'];
+  const isPasswordValid = validAdminPasswords.includes(password.trim());
+
+  if (!isAdminEmail || !isPasswordValid) {
+    return res.status(401).json({ error: 'Access Denied: Invalid administrator credentials or password.' });
+  }
+
+  const adminAccount = dbProfiles.find((u) => u.role === 'admin');
+  if (!adminAccount) {
+    return res.status(500).json({ error: 'Administrator profile could not be loaded.' });
+  }
+
+  res.json({
+    message: 'Institutional administrator clearance granted.',
+    profile: adminAccount,
+    token: adminAccount.id,
   });
 });
 
@@ -267,13 +372,26 @@ app.get('/api/auth/session', authenticateUser, (req, res) => {
   res.json({ profile: (req as any).user });
 });
 
-// Switch Role (Customer <-> Seller; Admin restricted to authorized profiles)
+// Switch Role (Admin, Seller, Buyer)
 app.post('/api/auth/switch-role', authenticateUser, (req, res) => {
-  const { newRole } = req.body;
+  const { newRole, adminPassword } = req.body;
   const currentUser = (req as any).user;
 
-  if (newRole === 'admin' && currentUser.id !== 'usr_admin') {
-    return res.status(403).json({ error: 'Access Denied: Admin role cannot be self-assigned.' });
+  if (newRole === 'admin') {
+    const validAdminPasswords = ['AdminPass@902', 'Admin@LPU2026', 'LPU-ADMIN-2026', 'TestPass@123'];
+    const isAlreadyAdmin = currentUser?.role === 'admin' && currentUser?.id === 'usr_admin';
+    const isPasswordValid = adminPassword && validAdminPasswords.includes(adminPassword.trim());
+
+    if (!isAlreadyAdmin && !isPasswordValid) {
+      return res.status(403).json({
+        error: 'Administrator authentication required: Admin role cannot be activated without valid administrator credentials.',
+      });
+    }
+
+    const adminAccount = dbProfiles.find((u) => u.role === 'admin');
+    if (adminAccount) {
+      return res.json({ message: 'Administrator credentials verified. Switched to Campus Administrator.', profile: adminAccount });
+    }
   }
 
   currentUser.role = newRole;
@@ -642,6 +760,11 @@ app.post('/api/disputes', authenticateUser, (req, res) => {
 
 // Admin Arbitrate Dispute
 app.put('/api/disputes/:id/resolve', authenticateUser, (req, res) => {
+  const currentUser = (req as any).user;
+  if (currentUser?.role !== 'admin') {
+    return res.status(403).json({ error: 'Access Denied: Only administrators can arbitrate campus disputes.' });
+  }
+
   const { id } = req.params;
   const { resolution } = req.body; // 'REFUND_BUYER' | 'RELEASE_TO_SELLER'
 

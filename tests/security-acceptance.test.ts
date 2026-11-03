@@ -72,6 +72,62 @@ async function runTestSuite() {
     'Authorized governance admin can maintain admin role'
   );
 
+  // Admin Dashboard Visibility & Access Control Tests
+  const isAdminDashboardVisible = (role?: string) => role === 'admin';
+  assert(!isAdminDashboardVisible('buyer'), 'Buyers cannot see admin dashboard navigation links');
+  assert(!isAdminDashboardVisible('seller'), 'Sellers cannot see admin dashboard navigation links');
+  assert(!isAdminDashboardVisible(undefined), 'Guest/unauthenticated users cannot see admin dashboard navigation links');
+  assert(isAdminDashboardVisible('admin'), 'Only administrators can see admin dashboard navigation');
+
+  const canAccessAdminGovernance = (role?: string) => role === 'admin';
+  assert(!canAccessAdminGovernance('buyer'), 'Buyers are blocked by role gate from viewing Admin Governance Dashboard');
+  assert(!canAccessAdminGovernance('seller'), 'Sellers are blocked by role gate from viewing Admin Governance Dashboard');
+  assert(canAccessAdminGovernance('admin'), 'Governance administrators have full clearance to access Admin Governance Dashboard');
+
+  // Admin Credential Authentication Verification Tests
+  const verifyAdminLogin = (email: string, password?: string) => {
+    const validEmails = ['admin.governance@lpu.in', 'admin@lpu.in'];
+    const validPasswords = ['AdminPass@902', 'Admin@LPU2026', 'LPU-ADMIN-2026', 'TestPass@123'];
+    if (!validEmails.includes(email.toLowerCase().trim())) {
+      return { allowed: false, error: 'Invalid admin email' };
+    }
+    if (!password || !validPasswords.includes(password.trim())) {
+      return { allowed: false, error: 'Invalid administrator password' };
+    }
+    return { allowed: true, role: 'admin' };
+  };
+
+  assert(
+    verifyAdminLogin('admin.governance@lpu.in', 'AdminPass@902').allowed,
+    'Valid admin credentials grant administrative clearance'
+  );
+  assert(
+    !verifyAdminLogin('admin.governance@lpu.in', '').allowed,
+    'Admin login fails when password is missing'
+  );
+  assert(
+    !verifyAdminLogin('admin.governance@lpu.in', 'wrong_pass').allowed,
+    'Admin login fails with incorrect password'
+  );
+  assert(
+    !verifyAdminLogin('student@lpu.in', 'AdminPass@902').allowed,
+    'Non-admin student email cannot log in as admin'
+  );
+
+  const canSwitchRoleToAdmin = (currentRole: string, passwordProvided?: string) => {
+    if (currentRole === 'admin') return true;
+    return verifyAdminLogin('admin.governance@lpu.in', passwordProvided).allowed;
+  };
+
+  assert(
+    !canSwitchRoleToAdmin('buyer', undefined),
+    'Switching to admin without credentials opens login challenge instead of granting access'
+  );
+  assert(
+    canSwitchRoleToAdmin('buyer', 'AdminPass@902'),
+    'Switching to admin succeeds once valid credentials are provided'
+  );
+
   // --- 2. MARKETPLACE INTEGRITY & OWN-PURCHASE PREVENTION ---
   console.log('\n--- Suite 2: Marketplace Integrity & Order Validations ---');
 

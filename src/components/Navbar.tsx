@@ -110,14 +110,26 @@ export const Navbar: React.FC = () => {
               )}
             </button>
 
+            {user?.role === 'admin' && (
+              <button
+                onClick={() => setActiveTab('admin')}
+                className={`hover:text-white transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
+                  activeTab === 'admin' ? 'text-[#FF6B00] font-semibold' : ''
+                }`}
+              >
+                <ShieldCheck className="w-4 h-4" />
+                Governance & Impact
+              </button>
+            )}
+
             <button
-              onClick={() => setActiveTab('admin')}
+              onClick={() => setActiveTab('login')}
               className={`hover:text-white transition-colors whitespace-nowrap shrink-0 flex items-center gap-1.5 ${
-                activeTab === 'admin' ? 'text-[#FF6B00] font-semibold' : ''
+                activeTab === 'login' ? 'text-[#FF6B00] font-semibold' : ''
               }`}
             >
-              <ShieldCheck className="w-4 h-4" />
-              Governance & Impact
+              <User className="w-4 h-4" />
+              Login / Account
             </button>
           </nav>
 
@@ -137,7 +149,7 @@ export const Navbar: React.FC = () => {
               )}
             </button>
 
-            {/* Role Switcher Pill */}
+            {/* Role Switcher Pill - Buyer & Seller for students; Admin capability only if authenticated as Admin */}
             <div className="hidden sm:flex items-center bg-[#111114] border border-[#27272A] rounded-lg p-0.5 text-xs font-medium">
               <button
                 onClick={() => setUserRole('buyer')}
@@ -155,17 +167,19 @@ export const Navbar: React.FC = () => {
               >
                 Seller
               </button>
-              <button
-                onClick={() => {
-                  setUserRole('admin');
-                  setActiveTab('admin');
-                }}
-                className={`px-2.5 py-1 rounded transition-colors ${
-                  user.role === 'admin' ? 'bg-[#FF6B00] text-black font-semibold' : 'text-[#A1A1AA] hover:text-white'
-                }`}
-              >
-                Admin
-              </button>
+              {user?.role === 'admin' && (
+                <button
+                  onClick={() => {
+                    setUserRole('admin');
+                    setActiveTab('admin');
+                  }}
+                  className={`px-2.5 py-1 rounded transition-colors ${
+                    user.role === 'admin' ? 'bg-[#FF6B00] text-black font-semibold' : 'text-[#A1A1AA] hover:text-white'
+                  }`}
+                >
+                  Admin
+                </button>
+              )}
             </div>
 
             {/* Student Verified Identity Card / Sign-In Button */}
@@ -258,14 +272,26 @@ export const Navbar: React.FC = () => {
             <span>Escrow</span>
           </button>
 
+          {user?.role === 'admin' && (
+            <button
+              onClick={() => setActiveTab('admin')}
+              className={`flex flex-col items-center gap-1 py-1 px-2 text-[11px] font-medium transition-colors ${
+                activeTab === 'admin' ? 'text-[#FF6B00]' : 'text-[#A1A1AA]'
+              }`}
+            >
+              <ShieldCheck className="w-5 h-5" />
+              <span>Admin</span>
+            </button>
+          )}
+
           <button
-            onClick={() => setActiveTab('admin')}
+            onClick={() => setActiveTab('login')}
             className={`flex flex-col items-center gap-1 py-1 px-2 text-[11px] font-medium transition-colors ${
-              activeTab === 'admin' ? 'text-[#FF6B00]' : 'text-[#A1A1AA]'
+              activeTab === 'login' ? 'text-[#FF6B00]' : 'text-[#A1A1AA]'
             }`}
           >
-            <ShieldCheck className="w-5 h-5" />
-            <span>Admin</span>
+            <User className="w-5 h-5" />
+            <span>Login</span>
           </button>
         </div>
       </nav>

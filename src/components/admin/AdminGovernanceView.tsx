@@ -12,21 +12,174 @@ import {
   FileText,
   DollarSign,
   ArrowUpRight,
+  Lock,
+  ShieldAlert,
+  ArrowRight,
 } from 'lucide-react';
 import { useMarketplace } from '../../context/MarketplaceContext';
 
 export const AdminGovernanceView: React.FC = () => {
   const {
+    user,
+    setActiveTab,
     listings,
     orders,
     auditLogs,
     donations,
     aiSessions,
     resolveDispute,
+    adminLogin,
   } = useMarketplace();
 
   const [activeSubTab, setActiveSubTab] = useState<'overview' | 'charity' | 'threats' | 'disputes'>('overview');
   const [threatFilter, setThreatFilter] = useState<string>('all');
+
+  // Inline Admin Login Form States
+  const [adminEmail, setAdminEmail] = useState('admin.governance@lpu.in');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [authError, setAuthError] = useState<string | null>(null);
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // Strict Institutional Role Gate: Non-admin users MUST log in with administrator credentials
+  if (user?.role !== 'admin') {
+    const handleAdminSubmit = async (e: React.FormEvent) => {
+      e.preventDefault();
+      setAuthError(null);
+      setIsVerifying(true);
+
+      const result = await adminLogin(adminEmail, adminPassword);
+      if (!result.success) {
+        setAuthError(result.error || 'Invalid administrator credentials. Access Denied.');
+      }
+      setIsVerifying(false);
+    };
+
+    const handleQuickFillAdmin = () => {
+      setAdminEmail('admin.governance@lpu.in');
+      setAdminPassword('AdminPass@902');
+      setAuthError(null);
+    };
+
+    return (
+      <div className="max-w-2xl mx-auto px-4 py-12 md:py-20">
+        <div className="bg-[#111114] border border-[#27272A] rounded-2xl p-6 md:p-8 shadow-2xl space-y-6">
+          <div className="text-center space-y-3">
+            <div className="w-14 h-14 rounded-2xl bg-amber-500/10 border border-amber-500/20 text-amber-400 mx-auto flex items-center justify-center">
+              <Lock className="w-7 h-7" />
+            </div>
+
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 text-xs font-semibold uppercase tracking-wider">
+              <ShieldAlert className="w-3.5 h-3.5" />
+              <span>Administrative Clearance Required</span>
+            </div>
+
+            <h2 className="text-2xl font-bold text-white tracking-tight">
+              LPU Governance & Impact Terminal Login
+            </h2>
+
+            <p className="text-xs text-[#A1A1AA] max-w-lg mx-auto leading-relaxed">
+              This terminal controls institutional escrow settlements, campus dispute arbitrations,
+              and security surveillance. You must authenticate with authorized LPU administrator
+              credentials to access the governance dashboard.
+            </p>
+          </div>
+
+          {/* Active Session Notice */}
+          <div className="p-3 bg-[#09090B] border border-[#27272A] rounded-xl text-left text-xs space-y-1">
+            <div className="text-[#71717A] text-[10px] font-medium uppercase tracking-wider">Current Session:</div>
+            <div className="flex items-center justify-between font-mono text-[#FAFAFA]">
+              <span className="truncate">{user?.name || 'Guest'} ({user?.email || 'unauthenticated'})</span>
+              <span className="px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/20 text-amber-400 font-semibold uppercase text-[10px] shrink-0">
+                Current Role: {user?.role || 'Guest'}
+              </span>
+            </div>
+          </div>
+
+          {authError && (
+            <div className="p-3.5 rounded-xl bg-red-500/10 border border-red-500/20 text-xs text-red-300 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />
+              <span>{authError}</span>
+            </div>
+          )}
+
+          {/* Embedded Admin Login Challenge Form */}
+          <form onSubmit={handleAdminSubmit} className="space-y-4 pt-2">
+            <div className="space-y-1 text-left">
+              <label className="text-xs font-medium text-[#A1A1AA]">Admin Institutional Email</label>
+              <input
+                type="email"
+                required
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                placeholder="admin.governance@lpu.in"
+                className="w-full bg-[#09090B] border border-[#27272A] rounded-xl px-3.5 py-2.5 text-xs text-white font-mono focus:outline-none focus:border-[#FF6B00]"
+              />
+            </div>
+
+            <div className="space-y-1 text-left">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-medium text-[#A1A1AA]">Admin Password / Security Key</label>
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="text-[10px] text-[#A1A1AA] hover:text-white"
+                >
+                  {showPassword ? 'Hide' : 'Show'}
+                </button>
+              </div>
+              <input
+                type={showPassword ? 'text' : 'password'}
+                required
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="Enter admin password (e.g. AdminPass@902)"
+                className="w-full bg-[#09090B] border border-[#27272A] rounded-xl px-3.5 py-2.5 text-xs text-white focus:outline-none focus:border-[#FF6B00]"
+              />
+            </div>
+
+            <div className="pt-2 flex flex-col sm:flex-row items-center gap-3">
+              <button
+                type="submit"
+                disabled={isVerifying}
+                className="w-full sm:flex-1 py-3 px-5 rounded-xl bg-[#FF6B00] hover:bg-[#FF8533] disabled:opacity-50 text-black font-bold text-xs transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-lg shadow-orange-500/10"
+              >
+                {isVerifying ? (
+                  'Verifying Administrator Credentials...'
+                ) : (
+                  <>
+                    <ShieldCheck className="w-4 h-4" />
+                    <span>Authenticate & Open Admin Dashboard</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveTab('marketplace')}
+                className="w-full sm:w-auto py-3 px-4 rounded-xl bg-[#18181B] hover:bg-[#27272A] text-[#A1A1AA] hover:text-white border border-[#27272A] text-xs font-medium transition-colors cursor-pointer"
+              >
+                Cancel & Return
+              </button>
+            </div>
+          </form>
+
+          {/* Quick-fill helper for test evaluation */}
+          <div className="pt-4 border-t border-[#27272A] flex items-center justify-between text-xs">
+            <span className="text-[11px] text-[#71717A]">Evaluation / Testing:</span>
+            <button
+              type="button"
+              onClick={handleQuickFillAdmin}
+              className="text-[11px] text-[#FF9F43] hover:underline flex items-center gap-1 cursor-pointer font-medium"
+            >
+              <CheckCircle className="w-3.5 h-3.5" />
+              <span>Autofill Test Admin Credentials</span>
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // Compute metrics
   const completedOrders = orders.filter((o) => o.status === 'COMPLETED');

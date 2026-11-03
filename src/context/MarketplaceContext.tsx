@@ -22,12 +22,16 @@ import {
 } from '../lib/escrow/handshake';
 import { NotificationItem } from '../components/notifications/NotificationDrawer';
 
-export type NavigationTab = 'marketplace' | 'ai' | 'security_lab' | 'handshake' | 'admin';
+export type NavigationTab = 'marketplace' | 'ai' | 'security_lab' | 'handshake' | 'admin' | 'login';
 
 interface MarketplaceContextType {
   user: UserProfile;
   setUser: (user: UserProfile) => void;
-  setUserRole: (role: 'buyer' | 'seller' | 'admin') => void;
+  setUserRole: (role: 'buyer' | 'seller' | 'admin', adminPassword?: string) => Promise<{ success: boolean; error?: string }>;
+  adminLogin: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  isAdminLoginModalOpen: boolean;
+  openAdminLoginModal: () => void;
+  closeAdminLoginModal: () => void;
   listings: Listing[];
   addListing: (
     listingData: Omit<
@@ -86,6 +90,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [activeListingForAI, setActiveListingForAI] = useState<Listing | null>(null);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isAdminLoginModalOpen, setIsAdminLoginModalOpen] = useState(false);
   const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [aiSessions, setAiSessions] = useState<AISession[]>([]);
   const [auditLogs, setAuditLogs] = useState<SecurityAuditEvent[]>(INITIAL_AUDIT_LOGS);
@@ -133,7 +138,37 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     });
   }, []);
 
-  const setUserRole = async (role: 'buyer' | 'seller' | 'admin') => {
+  const openAdminLoginModal = () => setIsAdminLoginModalOpen(true);
+  const closeAdminLoginModal = () => setIsAdminLoginModalOpen(false);
+
+  const adminLogin = async (email: string, password: string): Promise<{ success: boolean; error?: string }> => {
+    try {
+      const res = await fetch('/api/auth/admin-login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        return { success: false, error: data.error || 'Administrator authentication failed.' };
+      }
+      setUser(data.profile);
+      setIsAdminLoginModalOpen(false);
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: 'Connection error during administrator authentication.' };
+    }
+  };
+
+  const setUserRole = async (
+    role: 'buyer' | 'seller' | 'admin',
+    adminPassword?: string
+  ): Promise<{ success: boolean; error?: string }> => {
+    if (role === 'admin' && user?.role !== 'admin' && !adminPassword) {
+      setIsAdminLoginModalOpen(true);
+      return { success: false, error: 'Administrator authentication required.' };
+    }
+
     try {
       const res = await fetch('/api/auth/switch-role', {
         method: 'POST',
@@ -141,16 +176,24 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
           'Content-Type': 'application/json',
           Authorization: `Bearer ${user.id}`,
         },
-        body: JSON.stringify({ newRole: role }),
+        body: JSON.stringify({ newRole: role, adminPassword }),
       });
+      const data = await res.json();
       if (res.ok) {
-        const data = await res.json();
         setUser(data.profile);
+        return { success: true };
       } else {
-        setUser((prev) => ({ ...prev, role }));
+        if (role === 'admin') {
+          setIsAdminLoginModalOpen(true);
+        }
+        return { success: false, error: data.error || 'Failed to switch capability.' };
       }
     } catch (_) {
-      setUser((prev) => ({ ...prev, role }));
+      if (role !== 'admin') {
+        setUser((prev) => ({ ...prev, role }));
+        return { success: true };
+      }
+      return { success: false, error: 'Connection error during role update.' };
     }
   };
 
@@ -510,6 +553,10 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         isAuthModalOpen,
         openAuthModal,
         closeAuthModal,
+        isAdminLoginModalOpen,
+        openAdminLoginModal,
+        closeAdminLoginModal,
+        adminLogin,
         isNotificationOpen,
         setIsNotificationOpen,
         notifications,
