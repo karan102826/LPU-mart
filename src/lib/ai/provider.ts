@@ -157,9 +157,53 @@ export class DeterministicProvider implements AIProvider {
       } else {
         reply = `Regarding "${safeContext.title}" (Category: ${safeContext.category}, Condition: ${safeContext.condition}): It is listed at ₹${safeContext.price}. Meeting checkpoints include Uni-Mall and Central Library with verified dual-token QR protection!`;
       }
+    } else if ((promptLower.includes('cooler') || promptLower.includes('cooling') || /\bac\b/.test(promptLower)) && !promptLower.includes('accessories')) {
+      reply = `Yes! We have the **Bajaj PX97 Torque 36L Personal Desert Cooler** available right now in Girls Hostel 2 (GH-2)!
+• **Condition**: Like New (with antibacterial hexacool pads and smooth castor wheels)
+• **Purchase Price**: ₹4,200 (or rent at ₹45/day with ₹1,000 refundable deposit)
+• **Safe Handover**: Can be collected at the Uni-Mall or GH-2 checkpoint with 10% escrow protection.`;
+    } else if (
+      promptLower.includes('condition') ||
+      promptLower.includes('accessories') ||
+      promptLower.includes('lab') ||
+      promptLower.includes('included') ||
+      promptLower.includes('charger')
+    ) {
+      reply = `Here is how item conditions and lab accessories are verified on LPUmart:
+• **Condition Standards**:
+  - **Like New**: Pristine cosmetics, 90%+ battery/hardware health (e.g., MacBook Air M1, Bajaj Cooler, CLRS textbook).
+  - **Good**: Normal semester use, 100% operational hardware (e.g., Lenovo Legion 5, iPhone 13, Study Table).
+• **Included Lab & Hardware Accessories**:
+  - Coding Laptops: Include original chargers, power adapters, and protective sleeves.
+  - Gaming & Consoles: Controllers, power leads, HDMI cables, and game discs.
+  - Appliances: Power cords, stands, and castor wheels.
+• **Inspection Guarantee**: You inspect all physical accessories in person at Uni-Mall or Library before confirming delivery and releasing escrow funds!`;
+    } else if (promptLower.includes('macbook') || promptLower.includes('m1') || promptLower.includes('laptop')) {
+      reply = `Verified coding laptops available on campus:
+1. **Apple MacBook Air M1 (8GB / 256GB SSD) Space Grey** — ₹54,000 (or ₹350/day rent) with original 30W charger & sleeve (Uni-Mall).
+2. **Lenovo Legion 5 (Ryzen 7 / RTX 3060)** — ₹48,500 (or ₹400/day rent) with 165Hz IPS display and cleaned thermals (Block 34).`;
+    } else if (promptLower.includes('phone') || promptLower.includes('iphone') || promptLower.includes('oneplus')) {
+      reply = `Verified smartphones available on campus:
+1. **Apple iPhone 13 (128GB Midnight Black)** — ₹36,500 (Battery 88%, bill & box included, Uni-Mall).
+2. **OnePlus 11R 5G (8GB / 128GB Sonic Black)** — ₹27,900 or ₹190/day rent (Includes 100W SuperVOOC charger, Library).`;
+    } else if (promptLower.includes('table') || promptLower.includes('chair') || promptLower.includes('furniture')) {
+      reply = `Hostel furniture currently listed:
+• **Nilkamal Study Table + High-Back Mesh Chair** — ₹3,200 outright, or rent at ₹30/day (₹800 deposit). Located in BH-4 with Uni-Mall drop point.`;
+    } else if (promptLower.includes('book') || promptLower.includes('textbook') || promptLower.includes('grewal') || promptLower.includes('clrs')) {
+      reply = `Verified engineering textbooks available at the Central Library checkpoint:
+1. **Higher Engineering Mathematics (Dr. B.S. Grewal, 44th Edition)** — ₹450 for MTH165/166.
+2. **Introduction to Algorithms (CLRS 4th Edition Hardcover)** — ₹950 (or ₹15/day rent) for algorithms lab.`;
+    } else if (promptLower.includes('ps4') || promptLower.includes('playstation') || promptLower.includes('gaming')) {
+      reply = `Hostel gaming gear available at Uni-Mall:
+• **Sony PlayStation 4 Slim (500GB) Bundle** — ₹16,500 or ₹180/day rent (Includes 2 DualShock 4 controllers + FIFA 24 & Spider-Man discs).`;
     } else {
-      reply =
-        'Welcome to LPUmart! You can explore verified laptops, electronics, engineering textbooks, and hostel furniture. Every completed deal includes a 10% platform safety commission and ₹2 donation to Vridh Ashram. How can I help you today?';
+      reply = `Welcome to LPUmart AI! Here are top verified campus items ready for immediate handover:
+• **Appliances**: Bajaj PX97 36L Room Cooler (₹4,200 / ₹45/day rent) in GH-2
+• **Coding Laptops**: Apple MacBook Air M1 (₹54,000 / ₹350/day) & Lenovo Legion 5 RTX 3060 (₹48,500 / ₹400/day)
+• **Smartphones**: iPhone 13 (₹36,500) & OnePlus 11R 5G (₹27,900 / ₹190/day)
+• **Academic Books**: Dr. B.S. Grewal Mathematics (₹450) & CLRS Algorithms (₹950 / ₹15/day)
+• **Hostel Furniture**: Nilkamal Study Desk + Mesh Chair (₹3,200 / ₹30/day) in BH-4
+All deals are escrow-protected and allocate ₹2 to Vridh Ashram. Ask me about specs, rental deposits, or campus meeting points!`;
     }
 
     return {
