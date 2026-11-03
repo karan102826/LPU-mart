@@ -6,16 +6,35 @@ import {
   QrCode,
   ShieldCheck,
   CheckCircle2,
-  ChevronDown,
+  Bell,
+  User,
 } from 'lucide-react';
-import { useMarketplace, NavigationTab } from '../context/MarketplaceContext';
+import { useMarketplace } from '../context/MarketplaceContext';
+import { AuthModal } from './auth/AuthModal';
+import { NotificationDrawer } from './notifications/NotificationDrawer';
 
 export const Navbar: React.FC = () => {
-  const { activeTab, setActiveTab, user, setUserRole, openAIModal, orders } = useMarketplace();
+  const {
+    activeTab,
+    setActiveTab,
+    user,
+    setUserRole,
+    openAIModal,
+    orders,
+    isAuthModalOpen,
+    openAuthModal,
+    closeAuthModal,
+    isNotificationOpen,
+    setIsNotificationOpen,
+    notifications,
+    markNotificationRead,
+  } = useMarketplace();
 
   const activeHandshakeCount = orders.filter(
     (o) => o.status === 'ACCEPTED_IN_ESCROW' || o.status === 'HANDSHAKE_READY'
   ).length;
+
+  const unreadNotifCount = notifications.filter((n) => !n.read).length;
 
   return (
     <>
@@ -102,8 +121,22 @@ export const Navbar: React.FC = () => {
             </button>
           </nav>
 
-          {/* Zone 3: Profile & Interactive Role Selector */}
+          {/* Zone 3: Notification Bell, Profile & Interactive Role Selector */}
           <div className="flex items-center gap-3 shrink-0">
+            {/* Notification Bell Button */}
+            <button
+              onClick={() => setIsNotificationOpen(true)}
+              className="relative p-2 rounded-lg bg-[#111114] border border-[#27272A] text-[#A1A1AA] hover:text-white transition-colors"
+              title="Campus Notifications"
+            >
+              <Bell className="w-4 h-4" />
+              {unreadNotifCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-[#FF6B00] text-black text-[9px] font-bold rounded-full flex items-center justify-center">
+                  {unreadNotifCount}
+                </span>
+              )}
+            </button>
+
             {/* Role Switcher Pill */}
             <div className="hidden sm:flex items-center bg-[#111114] border border-[#27272A] rounded-lg p-0.5 text-xs font-medium">
               <button
@@ -135,8 +168,12 @@ export const Navbar: React.FC = () => {
               </button>
             </div>
 
-            {/* Student Verified Identity Card */}
-            <div className="flex items-center gap-2 bg-[#111114] border border-[#27272A] px-2.5 py-1.5 rounded-lg">
+            {/* Student Verified Identity Card / Sign-In Button */}
+            <button
+              onClick={openAuthModal}
+              className="flex items-center gap-2 bg-[#111114] hover:bg-[#18181B] border border-[#27272A] hover:border-[#3F3F46] px-2.5 py-1.5 rounded-lg transition-all text-left"
+              title="Click to Switch Student or Sign In"
+            >
               <div className="w-6 h-6 rounded-full bg-[#27272A] text-white flex items-center justify-center text-xs font-semibold">
                 {user.name.charAt(0)}
               </div>
@@ -151,10 +188,22 @@ export const Navbar: React.FC = () => {
                   Reg: {user.registrationNumber}
                 </div>
               </div>
-            </div>
+            </button>
           </div>
         </div>
       </header>
+
+      {/* Auth & Student Verification Modal */}
+      <AuthModal isOpen={isAuthModalOpen} onClose={closeAuthModal} />
+
+      {/* Persistent Notification Drawer */}
+      <NotificationDrawer
+        isOpen={isNotificationOpen}
+        onClose={() => setIsNotificationOpen(false)}
+        notifications={notifications}
+        onMarkRead={markNotificationRead}
+        onNavigateToHandshake={() => setActiveTab('handshake')}
+      />
 
       {/* Mobile Ergonomic Bottom Navigation Bar (< 15% Viewport Cap) */}
       <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-[#09090B]/95 backdrop-blur-lg border-t border-[#27272A] py-2 px-3">

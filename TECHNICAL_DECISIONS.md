@@ -6,9 +6,11 @@
 ## 2. Architecture & Runtime Decisions
 
 ### 2.1 Framework & Runtime Environment
-- **Client & Frontend**: React 19 SPA running with Vite & Tailwind CSS v4. Designed with modular App Router component architecture mirroring Next.js conventions (`/app`, `/lib`, `/services`, `/components`).
-- **Server Infrastructure**: Full-stack Node.js server with Express proxy mounting Vite middlewares during development and serving production assets on port 3000.
-- **Next.js Parity**: All business logic, input sanitizers, token generators, and provider abstractions are structured in cleanly decoupled TypeScript modules (`lib/`, `services/`) with identical signatures to Next.js Route Handlers and Server Actions.
+- **Client & Frontend**: React 19 SPA running with Vite & Tailwind CSS v4. Preserved existing cyberpunk design system, electric orange `#FF6B00` accents, responsive bottom bar, and component hierarchy.
+- **Server Infrastructure**: Full-stack Node.js server with Express (`server.ts`) mounting Vite middlewares during development and serving production assets on port 3000.
+- **REST Endpoints**: Authoritative backend routes for `/api/auth`, `/api/listings`, `/api/orders`, `/api/handshake/verify`, `/api/disputes`, `/api/donations`, `/api/notifications`, and `/api/admin`.
+- **Database Migrations**: Complete PostgreSQL schema and RLS policies created in `supabase/migrations/20261103000001_initial_schema.sql`.
+- **Supabase Clients**: Configured browser client (`src/lib/supabase/client.ts`) and server service-role client (`src/lib/supabase/server.ts`).
 
 ### 2.2 Database & Row Level Security (Supabase PostgreSQL)
 - **Supabase PostgreSQL Schema**: Complete relational schema defined with 24 authoritative tables:
@@ -35,8 +37,10 @@
 - **Layer 2: Complete Database Isolation**
   - AI tools can only query public marketplace columns: `title`, `description`, `price`, `rental_rate`, `category`, `condition`, `availability`.
   - Service-role credentials and internal schemas are blocked from runtime context.
-- **Layer 3: Provider Abstraction & Guardrails**
-  - Unified `AIProvider` interface supporting Google Gemini (live execution via `@google/genai`), OpenAI, and Anthropic.
+- **Layer 3: Provider Abstraction & Guardrails (Server-Side Architecture)**
+  - All `@google/genai` SDK initialization and execution executes exclusively server-side via Express routes (`/api/ai/chat` and `/api/ai/stream`).
+  - Utilizes active model `gemini-3.8-flash` with mandatory `aistudio-build` User-Agent telemetry headers.
+  - Client components communicate over HTTP/SSE without importing the SDK or exposing environment secrets to the browser.
   - System instruction guardrails strictly prohibit price negotiation, off-platform settlement, system prompt disclosure, or unauthorized role escalation.
 
 ### 2.4 AI Engagement Billing

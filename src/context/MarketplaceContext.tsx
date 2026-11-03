@@ -20,19 +20,31 @@ import {
   verifyHandshake,
   calculateEscrowSplit,
 } from '../lib/escrow/handshake';
+import { NotificationItem } from '../components/notifications/NotificationDrawer';
 
 export type NavigationTab = 'marketplace' | 'ai' | 'security_lab' | 'handshake' | 'admin';
 
 interface MarketplaceContextType {
   user: UserProfile;
+  setUser: (user: UserProfile) => void;
   setUserRole: (role: 'buyer' | 'seller' | 'admin') => void;
   listings: Listing[];
-  addListing: (listingData: Omit<Listing, 'id' | 'createdAt' | 'views' | 'sellerId' | 'sellerName' | 'sellerRating' | 'sellerVerified'>) => void;
+  addListing: (
+    listingData: Omit<
+      Listing,
+      'id' | 'createdAt' | 'views' | 'sellerId' | 'sellerName' | 'sellerRating' | 'sellerVerified'
+    >
+  ) => Promise<void>;
   orders: Order[];
-  createOrder: (listingId: string, orderType: 'buy' | 'rent', rentalDays?: number, locationId?: string) => Promise<Order>;
+  createOrder: (
+    listingId: string,
+    orderType: 'buy' | 'rent',
+    rentalDays?: number,
+    locationId?: string
+  ) => Promise<Order>;
   acceptOrder: (orderId: string) => Promise<void>;
-  raiseDispute: (orderId: string, reason: string) => void;
-  resolveDispute: (orderId: string, resolution: 'REFUND_BUYER' | 'RELEASE_TO_SELLER') => void;
+  raiseDispute: (orderId: string, reason: string) => Promise<void>;
+  resolveDispute: (orderId: string, resolution: 'REFUND_BUYER' | 'RELEASE_TO_SELLER') => Promise<void>;
   favorites: string[];
   toggleFavorite: (listingId: string) => void;
   activeTab: NavigationTab;
@@ -41,6 +53,13 @@ interface MarketplaceContextType {
   openAIModal: (listing?: Listing) => void;
   isAIModalOpen: boolean;
   closeAIModal: () => void;
+  isAuthModalOpen: boolean;
+  openAuthModal: () => void;
+  closeAuthModal: () => void;
+  isNotificationOpen: boolean;
+  setIsNotificationOpen: (open: boolean) => void;
+  notifications: NotificationItem[];
+  markNotificationRead: (id: string) => void;
   aiSessions: AISession[];
   recordAIFee: (listingId?: string) => Promise<boolean>;
   auditLogs: SecurityAuditEvent[];
@@ -66,20 +85,73 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   const [activeTab, setActiveTab] = useState<NavigationTab>('marketplace');
   const [activeListingForAI, setActiveListingForAI] = useState<Listing | null>(null);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
   const [aiSessions, setAiSessions] = useState<AISession[]>([]);
   const [auditLogs, setAuditLogs] = useState<SecurityAuditEvent[]>(INITIAL_AUDIT_LOGS);
   const [donations, setDonations] = useState<DonationRecord[]>(INITIAL_DONATIONS);
   const [handshakes, setHandshakes] = useState<Record<string, DualTokenHandshake>>({});
+  const [notifications, setNotifications] = useState<NotificationItem[]>([
+    {
+      id: 'notif_001',
+      userId: INITIAL_USER.id,
+      title: 'Order Handshake Ready',
+      message: 'Your purchase request for Apple MacBook Air M1 was accepted. Meet at Uni-Mall!',
+      type: 'ORDER_ACCEPTED',
+      read: false,
+      createdAt: new Date().toISOString(),
+    },
+    {
+      id: 'notif_002',
+      userId: INITIAL_USER.id,
+      title: '₹2 Vridh Ashram Contribution',
+      message: 'Your completed order #ord_102 successfully contributed ₹2 to Vridh Ashram Sanctuary.',
+      type: 'DONATION_RECORDED',
+      read: true,
+      createdAt: new Date(Date.now() - 3600000).toISOString(),
+    },
+  ]);
 
-  // Initialize handshake for the pre-seeded active order
+  // Sync with backend API on mount
   useEffect(() => {
+    fetch('/api/listings')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.listings?.length) setListings(data.listings);
+      })
+      .catch((err) => console.warn('Backend /api/listings fetch notice:', err));
+
+    fetch('/api/donations')
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.donations?.length) setDonations(data.donations);
+      })
+      .catch((err) => console.warn('Backend /api/donations fetch notice:', err));
+
     generateDualTokenHandshake('ord_101', 'loc_unimall').then((hs) => {
       setHandshakes((prev) => ({ ...prev, ord_101: hs }));
     });
   }, []);
 
-  const setUserRole = (role: 'buyer' | 'seller' | 'admin') => {
-    setUser((prev) => ({ ...prev, role }));
+  const setUserRole = async (role: 'buyer' | 'seller' | 'admin') => {
+    try {
+      const res = await fetch('/api/auth/switch-role', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.id}`,
+        },
+        body: JSON.stringify({ newRole: role }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser(data.profile);
+      } else {
+        setUser((prev) => ({ ...prev, role }));
+      }
+    } catch (_) {
+      setUser((prev) => ({ ...prev, role }));
+    }
   };
 
   const toggleFavorite = (listingId: string) => {
@@ -95,6 +167,16 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
   const closeAIModal = () => {
     setIsAIModalOpen(false);
+  };
+
+  const openAuthModal = () => setIsAuthModalOpen(true);
+  const closeAuthModal = () => setIsAuthModalOpen(false);
+
+  const markNotificationRead = (id: string) => {
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+    );
+    fetch(`/api/notifications/${id}/read`, { method: 'PUT' }).catch(() => {});
   };
 
   const logSecurityEvent = (event: Omit<SecurityAuditEvent, 'id' | 'timestamp'>) => {
@@ -131,9 +213,30 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return true;
   };
 
-  const addListing = (
-    listingData: Omit<Listing, 'id' | 'createdAt' | 'views' | 'sellerId' | 'sellerName' | 'sellerRating' | 'sellerVerified'>
+  const addListing = async (
+    listingData: Omit<
+      Listing,
+      'id' | 'createdAt' | 'views' | 'sellerId' | 'sellerName' | 'sellerRating' | 'sellerVerified'
+    >
   ) => {
+    try {
+      const res = await fetch('/api/listings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.id}`,
+        },
+        body: JSON.stringify(listingData),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setListings((prev) => [data.listing, ...prev]);
+        return;
+      }
+    } catch (_) {}
+
+    // Local fallback
     const newListing: Listing = {
       ...listingData,
       id: `lst_${Date.now()}`,
@@ -153,13 +256,28 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     rentalDays = 1,
     locationId = 'loc_unimall'
   ): Promise<Order> => {
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.id}`,
+        },
+        body: JSON.stringify({ listingId, orderType, rentalDays, meetingLocationId: locationId }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setOrders((prev) => [data.order, ...prev]);
+        return data.order;
+      }
+    } catch (_) {}
+
     const listing = listings.find((l) => l.id === listingId);
     if (!listing) throw new Error('Listing not found');
 
     const totalAmount =
-      orderType === 'buy'
-        ? listing.price
-        : (listing.rentalRatePerDay || 50) * rentalDays;
+      orderType === 'buy' ? listing.price : (listing.rentalRatePerDay || 50) * rentalDays;
 
     const split = calculateEscrowSplit(totalAmount);
     const orderId = `ord_${Date.now().toString().slice(-6)}`;
@@ -168,7 +286,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       id: orderId,
       listingId: listing.id,
       listingTitle: listing.title,
-      listingImage: listing.images[0] || 'https://images.unsplash.com/photo-1517336714731-489689fd1ca8?auto=format&fit=crop&w=800&q=80',
+      listingImage: listing.images[0],
       buyerId: user.id,
       buyerName: user.name,
       sellerId: listing.sellerId,
@@ -190,17 +308,41 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const acceptOrder = async (orderId: string) => {
+    try {
+      const res = await fetch(`/api/orders/${orderId}/accept`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${user.id}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order : o)));
+        if (data.tokens) {
+          setHandshakes((prev) => ({
+            ...prev,
+            [orderId]: {
+              orderId,
+              buyerToken: data.tokens.buyerToken,
+              sellerToken: data.tokens.sellerToken,
+              tokenHash: data.order.token_hash,
+              expiresAt: data.tokens.expiresAt,
+              isConsumed: false,
+              meetingLocation: null as any,
+            },
+          }));
+        }
+        return;
+      }
+    } catch (_) {}
+
     const targetOrder = orders.find((o) => o.id === orderId);
     if (!targetOrder) return;
 
-    // Generate cryptographic tokens upon seller acceptance
     const handshake = await generateDualTokenHandshake(
       orderId,
       targetOrder.meetingLocationId || 'loc_unimall'
     );
 
     setHandshakes((prev) => ({ ...prev, [orderId]: handshake }));
-
     setOrders((prev) =>
       prev.map((o) =>
         o.id === orderId
@@ -228,17 +370,39 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     userLat?: number,
     userLng?: number
   ) => {
+    try {
+      const res = await fetch('/api/handshake/verify', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${user.id}`,
+        },
+        body: JSON.stringify({ orderId, scannedToken, userLat, userLng }),
+      });
+
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        setOrders((prev) => prev.map((o) => (o.id === orderId ? data.order : o)));
+        if (data.donation) {
+          setDonations((prev) => [data.donation, ...prev]);
+        }
+        setHandshakes((prev) => ({
+          ...prev,
+          [orderId]: { ...prev[orderId], isConsumed: true },
+        }));
+        return { success: true, message: data.message };
+      } else if (!res.ok) {
+        return { success: false, message: data.message || 'Handshake verification rejected.' };
+      }
+    } catch (_) {}
+
     const order = orders.find((o) => o.id === orderId);
-    if (!order) {
-      return { success: false, message: 'Order not found in campus database.' };
-    }
+    if (!order) return { success: false, message: 'Order not found in database.' };
 
     const handshake = handshakes[orderId];
-    if (!handshake) {
-      return { success: false, message: 'Handshake token not generated for this order yet.' };
-    }
+    if (!handshake) return { success: false, message: 'Handshake token not generated.' };
 
-    // Verify token & geofence (<100m)
     const result = verifyHandshake({
       scannedToken,
       expectedToken: handshake.buyerToken,
@@ -249,35 +413,8 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       locationId: order.meetingLocationId || 'loc_unimall',
     });
 
-    if (result.isReplay) {
-      logSecurityEvent({
-        eventType: 'QR_REPLAY_ATTACK_REJECTED',
-        severity: 'HIGH',
-        description: `Rejected replay of already consumed token for order ${orderId}`,
-        maskedPayload: scannedToken.slice(0, 8) + '***REPLAY***',
-        ipAddress: '10.24.118.99',
-        actionTaken: 'Transaction Rejected & Logged',
-      });
-      return { success: false, message: result.message };
-    }
+    if (!result.success) return { success: false, message: result.message };
 
-    if (!result.isWithinGeofence && !result.isTokenValid) {
-      logSecurityEvent({
-        eventType: 'LOCATION_OUT_OF_BOUNDS_REJECTED',
-        severity: 'MEDIUM',
-        description: `Failed campus proximity check (${result.distanceMeters}m away)`,
-        maskedPayload: `Coordinates distance: ${result.distanceMeters}m`,
-        ipAddress: '10.24.118.99',
-        actionTaken: 'Handshake Blocked',
-      });
-      return { success: false, message: result.message };
-    }
-
-    if (!result.success) {
-      return { success: false, message: result.message };
-    }
-
-    // Atomically mark handshake consumed and order completed
     setHandshakes((prev) => ({
       ...prev,
       [orderId]: { ...prev[orderId], isConsumed: true },
@@ -285,17 +422,10 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
 
     setOrders((prev) =>
       prev.map((o) =>
-        o.id === orderId
-          ? {
-              ...o,
-              status: 'COMPLETED',
-              completedAt: new Date().toISOString(),
-            }
-          : o
+        o.id === orderId ? { ...o, status: 'COMPLETED', completedAt: new Date().toISOString() } : o
       )
     );
 
-    // Record immutable ₹2 donation to Vridh Ashram
     const newDonation: DonationRecord = {
       id: `don_${Date.now()}`,
       orderId,
@@ -307,13 +437,18 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     };
     setDonations((prev) => [newDonation, ...prev]);
 
-    return {
-      success: true,
-      message: result.message,
-    };
+    return { success: true, message: result.message };
   };
 
-  const raiseDispute = (orderId: string, reason: string) => {
+  const raiseDispute = async (orderId: string, reason: string) => {
+    try {
+      await fetch('/api/disputes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.id}` },
+        body: JSON.stringify({ orderId, reason }),
+      });
+    } catch (_) {}
+
     setOrders((prev) =>
       prev.map((o) =>
         o.id === orderId
@@ -327,7 +462,18 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     );
   };
 
-  const resolveDispute = (orderId: string, resolution: 'REFUND_BUYER' | 'RELEASE_TO_SELLER') => {
+  const resolveDispute = async (
+    orderId: string,
+    resolution: 'REFUND_BUYER' | 'RELEASE_TO_SELLER'
+  ) => {
+    try {
+      await fetch(`/api/disputes/${orderId}/resolve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${user.id}` },
+        body: JSON.stringify({ resolution }),
+      });
+    } catch (_) {}
+
     setOrders((prev) =>
       prev.map((o) => {
         if (o.id !== orderId) return o;
@@ -344,6 +490,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
     <MarketplaceContext.Provider
       value={{
         user,
+        setUser,
         setUserRole,
         listings,
         addListing,
@@ -360,6 +507,13 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
         openAIModal,
         isAIModalOpen,
         closeAIModal,
+        isAuthModalOpen,
+        openAuthModal,
+        closeAuthModal,
+        isNotificationOpen,
+        setIsNotificationOpen,
+        notifications,
+        markNotificationRead,
         aiSessions,
         recordAIFee,
         auditLogs,

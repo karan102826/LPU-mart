@@ -1,11 +1,12 @@
 /**
  * Governed AI Agent Ecosystem: Provider Abstraction & Guardrails
  *
- * Layer 2: Zero-Trust Database Isolation (Only allowlisted public marketplace attributes)
- * Layer 3: Provider Abstraction & Strict System Guardrails
+ * Client-Side API Dispatcher:
+ * - NEVER imports @google/genai or exposes keys in the browser.
+ * - Routes all AI requests through server-side proxy endpoint `/api/ai/chat`.
+ * - Layer 2: Zero-Trust Database Isolation projects only allowlisted public marketplace attributes.
  */
 
-import { GoogleGenAI } from '@google/genai';
 import { Listing } from '../../types';
 
 export interface SafeListingContext {
@@ -69,102 +70,41 @@ export interface AIProvider {
   chat(sanitizedPrompt: string, safeContext: SafeListingContext | null): Promise<AIProviderResponse>;
 }
 
-// 1. Google Gemini Provider (Primary active provider in Google AI Studio)
+// 1. Google Gemini Provider (Calls server-side proxy /api/ai/chat)
 export class GeminiProvider implements AIProvider {
   name = 'gemini' as const;
-  private client: GoogleGenAI | null = null;
-
-  constructor() {
-    const apiKey =
-      (typeof process !== 'undefined' && process.env?.GEMINI_API_KEY) ||
-      (typeof import.meta !== 'undefined' && (import.meta as any).env?.VITE_GEMINI_API_KEY) ||
-      '';
-    if (apiKey) {
-      try {
-        this.client = new GoogleGenAI({ apiKey });
-      } catch (err) {
-        console.warn('Gemini client initialization warning:', err);
-      }
-    }
-  }
 
   async chat(sanitizedPrompt: string, safeContext: SafeListingContext | null): Promise<AIProviderResponse> {
     const startTime = Date.now();
 
-    // Check prompt injection patterns directly in Layer 3 as defense-in-depth
-    const lower = sanitizedPrompt.toLowerCase();
-    if (
-      lower.includes('ignore all previous') ||
-      lower.includes('reveal system prompt') ||
-      lower.includes('reveal your system prompt') ||
-      lower.includes('dump database') ||
-      lower.includes('database credentials') ||
-      lower.includes('database isolation')
-    ) {
-      return {
-        content:
-          'Security Policy Violation: I am LPUmart AI, operating under strict governance guardrails. I cannot disclose internal system prompts, database schemas, or administrator credentials. How can I help you with campus marketplace products?',
-        provider: 'gemini',
-        latencyMs: Date.now() - startTime,
-        guardrailTriggered: true,
-      };
-    }
-
-    if (
-      lower.includes('commission to zero') ||
-      lower.includes('mark this order as paid') ||
-      lower.includes('bypass 10%') ||
-      lower.includes('give me your upi id')
-    ) {
-      return {
-        content:
-          'Transaction Policy Violation: All purchases and rentals on LPUmart must be processed through the official campus escrow protocol. Platform commission is fixed at 10% (supporting platform infrastructure and ₹2 Vridh Ashram donation). Off-platform payments and unauthorized status modifications are strictly prohibited.',
-        provider: 'gemini',
-        latencyMs: Date.now() - startTime,
-        guardrailTriggered: true,
-      };
-    }
-
-    if (lower.includes('registration number') || lower.includes('phone number') || lower.includes('email of the seller')) {
-      return {
-        content:
-          'Privacy Protection Notice: Student contact details and LPU registration numbers are strictly protected. For transaction coordination, please proceed with the official order flow and utilize the dual-token Handshake at approved campus locations (Uni-Mall, Academic Blocks).',
-        provider: 'gemini',
-        latencyMs: Date.now() - startTime,
-        guardrailTriggered: true,
-      };
-    }
-
-    if (!this.client) {
-      // Fallback to deterministic governed response
-      return new DeterministicProvider().chat(sanitizedPrompt, safeContext);
-    }
-
     try {
-      const contextPrompt = safeContext
-        ? `\nItem Context (Public info only):
-Title: ${safeContext.title}
-Category: ${safeContext.category}
-Condition: ${safeContext.condition}
-Price: ₹${safeContext.price}
-Rental Rate: ${safeContext.rentalRatePerDay ? `₹${safeContext.rentalRatePerDay}/day` : 'N/A'}
-Availability: ${safeContext.available ? 'Available' : 'Sold out'}`
-        : '\nNo specific product selected; answering general marketplace questions.';
-
-      const response = await this.client.models.generateContent({
-        model: 'gemini-2.5-flash',
-        contents: `${SYSTEM_GOVERNANCE_INSTRUCTION}\n${contextPrompt}\n\nStudent User Query: ${sanitizedPrompt}`,
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          sanitizedPrompt,
+          safeContext,
+          provider: 'gemini',
+        }),
       });
 
-      return {
-        content: response.text || 'LPUmart AI: Happy to assist you on the campus marketplace!',
-        provider: 'gemini',
-        latencyMs: Date.now() - startTime,
-      };
+      if (res.ok) {
+        const data = await res.json();
+        return {
+          content: data.content,
+          provider: 'gemini',
+          latencyMs: data.latencyMs || Date.now() - startTime,
+          guardrailTriggered: Boolean(data.guardrailTriggered),
+        };
+      }
     } catch (err) {
-      console.error('Gemini API call failed, falling back to governed engine:', err);
-      return new DeterministicProvider().chat(sanitizedPrompt, safeContext);
+      console.warn('Server proxy /api/ai/chat unreachable, using safe governed fallback:', err);
     }
+
+    // Fallback to deterministic governed response
+    return new DeterministicProvider().chat(sanitizedPrompt, safeContext);
   }
 }
 
@@ -231,11 +171,18 @@ export class DeterministicProvider implements AIProvider {
   }
 }
 
-// 3. OpenAI & Anthropic Provider Abstractions
+// 3. OpenAI & Anthropic Provider Abstractions (Routed to server-side proxy)
 export class OpenAIProvider implements AIProvider {
   name = 'openai' as const;
   async chat(sanitizedPrompt: string, safeContext: SafeListingContext | null): Promise<AIProviderResponse> {
-    // In preview without direct OpenAI key, safely route through governed engine with provider attribution
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sanitizedPrompt, safeContext, provider: 'openai' }),
+      });
+      if (res.ok) return res.json();
+    } catch (_) {}
     const res = await new DeterministicProvider().chat(sanitizedPrompt, safeContext);
     return { ...res, provider: 'openai' };
   }
@@ -244,7 +191,14 @@ export class OpenAIProvider implements AIProvider {
 export class AnthropicProvider implements AIProvider {
   name = 'anthropic' as const;
   async chat(sanitizedPrompt: string, safeContext: SafeListingContext | null): Promise<AIProviderResponse> {
-    // In preview without direct Anthropic key, safely route through governed engine with provider attribution
+    try {
+      const res = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ sanitizedPrompt, safeContext, provider: 'anthropic' }),
+      });
+      if (res.ok) return res.json();
+    } catch (_) {}
     const res = await new DeterministicProvider().chat(sanitizedPrompt, safeContext);
     return { ...res, provider: 'anthropic' };
   }

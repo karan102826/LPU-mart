@@ -1,159 +1,120 @@
-# LPUmart — Governed AI Agent Ecosystem
+# LPUmart — Full-Stack Campus Marketplace Implementation Plan
 
-> **Tagline**: Buy. Sell. Rent. Right on campus.  
-> An enterprise-grade governed campus marketplace and AI security demonstration platform designed exclusively for the Lovely Professional University (LPU) student community.
+> **Goal**: Turn the existing LPUmart prototype into a secure, production-grade full-stack campus marketplace by implementing a robust Node.js/Express backend, Supabase PostgreSQL schema with RLS, institutional student authentication, persistent notifications, and atomic cryptographic escrow handshakes while preserving the existing React 19 + Vite frontend and cyberpunk UI design.
 
 ---
 
-### User Review & Critical Decisions
+### User Review & Confirmed Architectural Choices
 
 > [!IMPORTANT]
-> The following architectural and interactive preferences have been confirmed for the live preview and hackathon evaluation:
+> The following design and implementation choices were confirmed during Phase 1:
 
-- **AI Provider Strategy**: Built on a unified provider abstraction layer with live Google Gemini API execution in the AI Studio environment alongside mockable/configurable OpenAI and Anthropic provider interfaces.
-- **AI Security Lab ("Break The Agent")**: Featured as a primary top-level navigation tab with 8 automated test scenarios, live custom prompt injection test bench, and step-by-step deflection pipeline visualization (Input → Deterministic Inspection → Redacted Message → LLM Execution Gate → Security Audit Log).
-- **Campus Escrow & Handshake Protocol**: Demonstrated with an interactive Campus Handshake Simulator featuring authentic LPU meeting zones (Uni-Mall, Block 34, Central Library, Boys Hostel 4, Girls Hostel 2), dual-token cryptographically signed QR code rendering, and real-time GPS 100m proximity verification.
-- **Architectural Documentation**: Complete `TECHNICAL_DECISIONS.md` file maintained in the repository root documenting the server-side architecture, Supabase schema definitions, rate limiting, and Next.js / Express parity.
+- **Supabase Integration & Persistence**: Supabase PostgreSQL and Supabase Auth with strict environment validation, comprehensive SQL migrations, and robust server-side API endpoints.
+- **Authentication & Campus Identity**: Interactive Auth Modal supporting student registration, login, institutional `@lpu.in` verification, profile management, and quick student profile switching for demo testing.
+- **Real-Time Updates & Notifications**: Real-time order state updates, handover alerts, and persistent notification center.
+- **Backend-Authoritative Governance**: All role checks, financial calculations (paise precision), token validation, and dispute settlements execute on the server, not in the browser.
 
 ---
 
 ## 1. Overview & Core Concept
 
-**LPUmart** is a hyper-localized student marketplace and a real-world sandbox for a **Governed AI Agent Ecosystem**. The platform enables verified LPU students to buy, sell, and rent laptops, smartphones, engineering textbooks, lab coats, hostel furniture, gaming gear, and campus essentials.
-
-### The Core Philosophy
-> *"AI should have the intelligence to assist users, but never the unrestricted authority to compromise user privacy, financial integrity, or platform governance."*
-
-### Key Innovations
-1. **Governed AI Agent Intermediary**: Natural-language product discovery and inquiry with 3 strict defense layers: Deterministic Regex/NER Input Deflection (blocking phone numbers, emails, UPI VPAs, and registration numbers), Zero-Trust Database Isolation (only public listing attributes reachable), and Backend Policy Guardrails.
-2. **Transparent AI Session Fee**: Transparent ₹5 per item-query engagement fee with explicit confirmation dialogs, idempotency protection, and auditable customer billing history.
-3. **Smart Campus Handshake & Escrow**: Dual-token QR exchange with server-side SHA-256 hash validation, campus coordinate geofencing (100m radius), and single-use replay protection.
-4. **Vridh Ashram Social Allocation**: Immutable ₹2 charitable allocation recorded on every completed campus sale with real-time community impact tracking.
-5. **Interactive AI Security Lab**: A dedicated test bench for judges and security auditors to execute live attacks (PII extraction, prompt injection, off-platform payment attempts, QR replay) and observe real-time defense layers in action.
+**LPUmart** is a hyper-localized student marketplace for Lovely Professional University. Students can buy, sell, and rent laptops, smartphones, engineering textbooks, hostel furniture, and electronics. The platform combines:
+1. **Governed AI Agent Ecosystem**: 3-layer defensive intermediate assistant (Layer 1 deterministic PII deflection, Layer 2 zero-trust database isolation, Layer 3 Gemini 3.8 Flash model guardrails) with ₹5 session billing.
+2. **Dual-Token Campus Handshake**: Cryptographic SHA-256 tokens with single-use replay protection and 100m GPS geofencing around approved campus checkpoints (Uni-Mall, Block 34, Library, BH4, GH2).
+3. **Double-Entry Financial Ledger**: 10% platform safety commission and ₹2 immutable social allocation to Vridh Ashram per completed deal.
+4. **Institutional Verification & Admin Governance**: Role-based access control, dispute arbitration console, and threat audit telemetry.
 
 ---
 
-## 2. User Experience & Visual Design
-
-### Visual Identity & Theme
-- **Aesthetic Direction**: High-end cyberpunk-inspired campus technology startup. Clean, dark, matte surfaces with high-visibility electric orange and amber accents.
-- **Color Palette (60-30-10 discipline)**:
-  - *Dominant Neutral (60%)*: Pure black (`#000000`) and deep matte background (`#09090B`).
-  - *Structural Surfaces (30%)*: Elevated card surfaces (`#111114`), hairline zinc borders (`#27272A`), soft charcoal overlays, and secondary text (`#A1A1AA`).
-  - *Accent Budget (10%)*: Electric orange (`#FF6B00`) for primary actions, amber (`#FF9F43`) for highlights, and emerald (`#10B981`) for verified badges.
-- **Typography**: Clean display font paired with high-legibility geometric sans (`Plus Jakarta Sans`), tabular figures (`tabular-nums`) for currency and transaction hashes, and strict unboxed metadata (`·` typographic separators, zero-pill discipline).
-- **Navigation (Mobile & Desktop)**:
-  - *Desktop*: Strict 1-row, 3-zone top bar contract (Brand Wordmark, 5 clean navigation links: *Marketplace*, *AI Assistant*, *Security Lab*, *Escrow & Handshake*, *Admin*, and 1 primary Action CTA).
-  - *Mobile*: Compact sticky header + 5-tab ergonomic bottom navigation bar (`<15%` sticky viewport cap).
-
-### Key User Flows
-1. **Marketplace Discovery & Filtering**: Search products by keyword, category (Laptops, Textbooks, Electronics, Furniture, etc.), transaction type (*Buy* vs *Rent*), condition, and price sort with instant client-side filtering and contiguous product detail drawers.
-2. **AI Shopping Assistant with ₹5 Fee Guard**: Customer clicks "Ask LPU AI" on a listing; receives an upfront ₹5 engagement fee disclosure; upon accepting, a session is initialized, sanitizing inquiries and providing grounded product advice while blocking any shared phone/UPI details.
-3. **Order Placement & Dual-Token Escrow Handshake**: Buyer initiates purchase or rental; order enters escrow; seller accepts and generates a one-time cryptographic buyer QR code; both parties open the Handshake screen at a designated campus hotspot (e.g., Uni-Mall); GPS confirms mutual proximity (<100m); scanning validates tokens atomically and finalizes payment.
-4. **Break-The-Agent Security Lab**: Live sandbox with one-click test suites executing real attacks against the deterministic filter and AI backend, displaying input, masked payload, LLM gate status, and generated audit events.
-5. **Administrator Governance Center**: Real-time KPI counters (Marketplace Volume, 10% Platform Commission, Vridh Ashram Fund, AI Engagement Fees, Blocked PII Incidents, Active Disputes) with student verification and dispute resolution workflows.
-
----
-
-## 3. Key Product Decisions & Trade-Offs
-
-- **Multi-Provider AI Architecture**:
-  - *Decision*: Native integration with Google Gemini via `@google/genai` (leveraging AI Studio environment credentials) combined with an abstract provider interface (`AIProvider` interface) supporting OpenAI and Anthropic.
-  - *Why*: Delivers guaranteed live execution in the preview environment while preserving production parity with OpenAI / Anthropic configurations.
-- **Layer 1 Deterministic Deflection Before LLM**:
-  - *Decision*: Hard regex-based pattern matchers for Indian phone numbers (`+91`, 10-digit mobile), email addresses, UPI VPAs (`@okhdfcbank`, `@paytm`, etc.), and LPU registration numbers (`118...`, `12...`) that mask content into `"Contact details are protected by LPUmart."` before sending payload to the AI model.
-  - *Why*: Eliminates hallucination risks and prompt injection bypasses. If the LLM never sees the raw PII, it is physically incapable of leaking it.
-- **Simulated Escrow Ledger with Authoritative State Machine**:
-  - *Decision*: Authoritative server-side ledger with strict state transitions (`PENDING` → `SELLER_ACCEPTED` → `HANDSHAKE_READY` → `COMPLETED` or `DISPUTED`).
-  - *Why*: Avoids unlawful custody of real funds while demonstrating mathematically complete double-entry bookkeeping, 10% platform commission cuts, and ₹2 charity allocations.
-- **Interactive GPS Campus Hotspot Simulator**:
-  - *Decision*: Support real device `navigator.geolocation` paired with an interactive campus hotspot simulator allowing judges to test matching locations (within 100m of Uni-Mall) vs out-of-range scenarios.
-  - *Why*: Evaluators testing on desktop browsers or outside LPU campus grounds can seamlessly test the 100m proximity lock.
-
----
-
-## 4. Technical Architecture & Data Strategy
+## 2. Technical Architecture & Component Hierarchy
 
 ```
 ┌────────────────────────────────────────────────────────────────────────┐
-│                         LPUmart Client (React 19)                      │
-│  ┌─────────────┐ ┌──────────────┐ ┌──────────────┐ ┌────────────────┐  │
-│  │ Marketplace │ │ Governed AI  │ │ Security Lab │ │ Escrow Hand-   │  │
-│  │ & Discovery │ │ Assistant    │ │ (Break Agent)│ │ shake (QR+GPS) │  │
-│  └──────┬──────┘ └──────┬───────┘ └──────┬───────┘ └───────┬────────┘  │
-└─────────┼───────────────┼────────────────┼─────────────────┼───────────┘
-          │               │                │                 │
-          ▼               ▼                ▼                 ▼
-┌────────────────────────────────────────────────────────────────────────┐
-│                   Server API Layer & Security Middleware               │
-│                                                                        │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ Layer 1: Deterministic Input Inspection & PII Deflection Engine  │  │
-│  │ (Regex / Pattern Sanitizer: Phone, Email, UPI VPA, RegNo)       │  │
-│  └──────────────────────────────┬───────────────────────────────────┘  │
-│                                 ▼                                      │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ Layer 2: Zero-Trust Database Isolation & Allowlisted Attributes  │  │
-│  │ (Only Public Listing Fields Exposed; Auth & Profiles Isolated)   │  │
-│  └──────────────────────────────┬───────────────────────────────────┘  │
-│                                 ▼                                      │
-│  ┌──────────────────────────────────────────────────────────────────┐  │
-│  │ Layer 3: Governed AI Provider Abstraction (Gemini / OpenAI / Anth)│  │
-│  │ System Instruction Guardrails & Anti-Prompt-Injection Boundary   │  │
-│  └──────────────────────────────┬───────────────────────────────────┘  │
-│                                 │                                      │
-│  ┌──────────────────────────────┴───────────────────────────────────┐  │
-│  │ Escrow Engine, Cryptographic Dual-Token QR & Location Handshake  │  │
-│  └──────────────────────────────┬───────────────────────────────────┘  │
+│                        React 19 Frontend (Vite)                        │
+│  ┌──────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐   │
+│  │ Marketplace  │ │ AI Assistant │ │ Security Lab │ │ Escrow Hand- │   │
+│  │ Catalog/PDP  │ │ Modal (₹5)   │ │ (8 Scenarios)│ │ shake (QR)   │   │
+│  └──────┬───────┘ └──────┬───────┘ └──────┬───────┘ └──────┬───────┘   │
+│         │                │                │                │           │
+│  ┌──────┴────────────────┴────────────────┴────────────────┴───────┐   │
+│  │ Auth Modal · Notification Center · MarketplaceContext Provider  │   │
+│  └──────────────────────────────┬──────────────────────────────────┘   │
 └─────────────────────────────────┼──────────────────────────────────────┘
+                                  │ HTTP / SSE / REST (/api/*)
                                   ▼
 ┌────────────────────────────────────────────────────────────────────────┐
-│                        Data & Audit Persistence                        │
-│  ┌───────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐  │
-│  │ Profiles &    │ │ Listings &   │ │ Orders &     │ │ Financial    │  │
-│  │ Student IDs   │ │ Categories   │ │ Dual Tokens  │ │ Escrow Ledger│  │
-│  └───────────────┘ └──────────────┘ └──────────────┘ └──────────────┘  │
-│  ┌───────────────┐ ┌──────────────┐ ┌──────────────┐ ┌──────────────┐  │
-│  │ AI Sessions & │ │ Audit Logs & │ │ Vridh Ashram │ │ Rate Limiter │  │
-│  │ ₹5 Fee Ledger │ │ Threat Intel │ │ Charity Fund │ │ Storage      │  │
-│  └───────────────┘ └──────────────┘ └──────────────┘ └──────────────┘  │
+│                     Node.js / Express Server (server.ts)               │
+│                                                                        │
+│  ┌───────────────────────┐ ┌───────────────────────┐ ┌──────────────┐  │
+│  │ Auth & RLS Middleware │ │ Input Deflection (L1) │ │ Rate Limiter │  │
+│  └──────────┬────────────┘ └──────────┬────────────┘ └──────┬───────┘  │
+│             │                         │                     │          │
+│  ┌──────────▼─────────────────────────▼─────────────────────▼───────┐  │
+│  │ Express Route Controllers:                                       │  │
+│  │ • /api/auth (Register, Login, Session, Verify Student)           │  │
+│  │ • /api/listings (CRUD, Search, Categories, Condition, Favourites)│  │
+│  │ • /api/orders (Create, Accept, Cancel, Status Transition)        │  │
+│  │ • /api/handshake (Cryptographic Token Gen, Atomic Replay Guard)  │  │
+│  │ • /api/escrow (Double-Entry Ledger, Vridh Ashram Fund, Disputes) │  │
+│  │ • /api/ai/chat & /api/ai/stream (Gemini 3.8 Flash Server Proxy)  │  │
+│  │ • /api/notifications (Read/Unread, Order Events)                 │  │
+│  │ • /api/admin (Metrics, User Moderation, Dispute Arbitration)     │  │
+│  └────────────────────────────────────┬─────────────────────────────┘  │
+└───────────────────────────────────────┼────────────────────────────────┘
+                                        │ Server-Side Service Role / REST
+                                        ▼
+┌────────────────────────────────────────────────────────────────────────┐
+│                   Supabase PostgreSQL & Storage Layer                  │
+│                                                                        │
+│  • 24 Relational Tables (profiles, listings, orders, escrow, audit)    │
+│  • Row-Level Security (RLS) Policies on every table                   │
+│  • Atomic Handshake Token State Updates                                │
+│  • Immutable Vridh Ashram Social Ledger & Audit Logs                   │
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
-### Core Entities & State Architecture
-1. **Listings & Categories**: Catalog with rich attributes (condition, selling price, daily rental rate, security deposit, availability status, seller verified tag, high-res photos).
-2. **Governed AI Sessions**: Session records tracking customer ID, target listing, cumulative ₹5 fee status, message history with before/after redaction snapshots, and deflection counters.
-3. **Escrow Transactions & Tokens**: Dual tokens (Buyer Token, Seller Token) hashed with SHA-256 with 15-minute TTL, linked to designated campus meeting coordinates.
-4. **Double-Entry Financial Ledger**:
-   - `selling_price` (Gross)
-   - `platform_commission` (10%)
-   - `seller_payout` (90% - Charity)
-   - `charity_vridh_ashram` (₹2 flat per completed deal)
-   - `ai_engagement_fee` (₹5 recorded per session)
-5. **Threat Intelligence & Audit Log**: Immutable record of sanitization events, blocked PII payloads (without storing raw PII), prompt injection flags, and unauthorized settlement attempts.
-
 ---
 
-## 5. Implementation Sequence & Next Steps
+## 3. Implementation Phases & Key Milestones
 
-1. **Step 1: Core Foundation & Technical Decisions**:
-   - Create `TECHNICAL_DECISIONS.md` documenting architecture mappings, Supabase schema definitions, and security policies.
-   - Configure global cyberpunk theme tokens, typography, and viewport structure.
-2. **Step 2: Server API & Security Engine**:
-   - Implement Layer 1 Input Deflection engine (regex & heuristics for phone, email, UPI, reg numbers).
-   - Implement Layer 2 Zero-Trust query projection.
-   - Implement Layer 3 AI Provider abstraction with live Gemini integration and prompt guardrails.
-   - Implement cryptographic dual-token generation and validation.
-3. **Step 3: Marketplace & Discovery**:
-   - Seed rich catalog of campus listings across Electronics, Laptops, Textbooks, Furniture, and Gaming.
-   - Build product grid, dynamic category filtering, rental/buy mode switches, search, and detail modal.
-4. **Step 4: Governed AI Intermediary & ₹5 Fee Flow**:
-   - Build slide-out AI Assistant with upfront ₹5 session confirmation, real-time sanitization indicators, and contextual product recommendations.
-5. **Step 5: Campus Escrow & Handshake Protocol**:
-   - Build dual-token QR code generator and Handshake verification interface with campus map and GPS proximity validator (<100m).
-6. **Step 6: Break-The-Agent AI Security Lab**:
-   - Implement interactive attack test bench with 8 preconfigured exploit scenarios and custom attack runner.
-7. **Step 7: Administrator & Social Impact Dashboard**:
-   - Build analytics counters, Vridh Ashram donation reconciliation ledger, dispute arbitrator, and threat log explorer.
-8. **Step 8: Verification & Quality Assurance**:
-   - Run compilation and tests across all modules to verify error-free execution.
+### Phase 1: Database Migrations & Supabase Architecture
+- Author comprehensive SQL migrations (`supabase/migrations/20261103000001_initial_schema.sql`):
+  - Normalized schemas for `profiles`, `student_verifications`, `categories`, `listings`, `orders`, `escrow_accounts`, `escrow_transactions`, `commission_records`, `donation_ledger`, `transaction_tokens`, `dispute_records`, `notifications`, `audit_logs`.
+  - Comprehensive Row-Level Security (RLS) policies:
+    - Users can read public listings and update only their own listings.
+    - Buyers & sellers can view only their respective orders.
+    - Financial ledger and transaction token updates restricted to server-side service role.
+    - Admin-only routes validated through verified role checks.
+- Create Supabase client utility (`src/lib/supabase/client.ts` and `src/lib/supabase/server.ts`).
+
+### Phase 2: Express Backend Foundation & API Routes
+- Implement complete Express API route handlers in `server.ts` (or modular route controllers):
+  - `/api/auth`: Student registration with `@lpu.in` domain check, password login, session verification, logout, student verification state (`UNVERIFIED`, `PENDING`, `VERIFIED`, `REJECTED`).
+  - `/api/listings`: Browse with category/condition/price filters, search, create, update, delete, toggle favourite.
+  - `/api/orders`: Order placement, rental duration calculation, seller acceptance, cancellation.
+  - `/api/handshake`: Cryptographic dual-token generation (SHA-256 hash), atomic token validation, 100m geofence verification, single-use replay protection.
+  - `/api/escrow`: Double-entry transaction ledger (paise precision), 10% platform commission, ₹2 Vridh Ashram donation allocation, dispute creation, admin arbitration.
+  - `/api/notifications`: Persistent user notifications for order milestones.
+  - `/api/admin`: Governance KPI counters, user verification approvals, threat audit stream.
+  - `/api/health`: Health-check and configuration status endpoint.
+
+### Phase 3: Client-Side State & Context Integration
+- Update `MarketplaceContext.tsx` to communicate with backend `/api/*` endpoints.
+- Integrate real token storage and user authentication state.
+- Implement an interactive **Auth & Student Verification Modal** (`AuthModal.tsx`) with registration, login, and quick-profile switching for evaluator convenience.
+- Add a **Notification Drawer / Popover** in `Navbar.tsx` displaying real-time order alerts.
+
+### Phase 4: Dispute & Handover Management Polish
+- Wire real dispute submission with evidence description.
+- Implement admin arbitration actions (Refund Buyer vs Release to Seller) that atomically update escrow states.
+- Ensure all QR handshake scanning and GPS checks communicate with `/api/handshake/verify`.
+
+### Phase 5: Verification & Automated Test Suite
+- Expand `tests/security-acceptance.test.ts` to test:
+  1. Student registration & unauthorized admin escalation prevention.
+  2. Listing creation & backend price validation.
+  3. Layer 1 PII sanitization and Layer 3 Gemini server proxy.
+  4. Dual-token QR handshake single-use and replay rejection.
+  5. Geofence distance calculation (<100m).
+  6. Double-entry escrow financial math (10% commission + ₹2 charity).
+- Run `compile_applet`, `lint_applet`, and the test suite to ensure 100% passing status.
