@@ -993,12 +993,14 @@ app.post('/api/ai/chat', async (req, res) => {
   if (provider === 'gemini') {
     try {
       const contextPrompt = buildContextPrompt(safeContext);
+      const contents = `${SYSTEM_GOVERNANCE_INSTRUCTION}\n${contextPrompt}\n\nStudent User Query: ${sanitizedPrompt}`;
+      
       const response = await Promise.race([
         ai.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: `${SYSTEM_GOVERNANCE_INSTRUCTION}\n${contextPrompt}\n\nStudent User Query: ${sanitizedPrompt}`,
+          model: 'gemini-flash-lite-latest',
+          contents,
         }),
-        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 3500)),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('TIMEOUT')), 6500)),
       ]);
 
       if (response && (response as any).text) {
@@ -1010,7 +1012,7 @@ app.post('/api/ai/chat', async (req, res) => {
         });
       }
     } catch (err: any) {
-      console.warn('Gemini proxy fell back to Catalog Intelligence Engine:', err?.message || err);
+      console.warn('Gemini primary model failed, falling back to catalog intelligence:', err?.message || err);
     }
   }
 
@@ -1041,7 +1043,7 @@ app.post('/api/ai/stream', async (req, res) => {
   try {
     const contextPrompt = buildContextPrompt(safeContext);
     const stream = await ai.models.generateContentStream({
-      model: 'gemini-3.8-flash',
+      model: 'gemini-flash-lite-latest',
       contents: `${SYSTEM_GOVERNANCE_INSTRUCTION}\n${contextPrompt}\n\nStudent User Query: ${sanitizedPrompt}`,
     });
 
