@@ -1,5 +1,4 @@
 import express from 'express';
-import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import dotenv from 'dotenv';
@@ -26,8 +25,21 @@ dotenv.config();
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const app = express();
 const PORT = process.env.PORT || 3000;
-
 app.use(express.json());
+
+// Normalize incoming URLs for Vercel serverless rewrites
+app.use((req, _res, next) => {
+  if (
+    !req.url.startsWith('/api') &&
+    !req.url.startsWith('/_') &&
+    !req.url.startsWith('/@') &&
+    !req.url.startsWith('/src') &&
+    !req.url.startsWith('/node_modules')
+  ) {
+    req.url = '/api' + (req.url.startsWith('/') ? req.url : '/' + req.url);
+  }
+  next();
+});
 
 // In-Memory Database Store (mirrors Supabase PostgreSQL relational schema for high performance)
 let dbProfiles = [
@@ -1263,6 +1275,7 @@ async function startServer() {
       res.sendFile(path.resolve(__dirname, 'dist', 'index.html'));
     });
   } else {
+    const { createServer: createViteServer } = await import('vite');
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: 'spa',
@@ -1275,7 +1288,8 @@ async function startServer() {
   });
 }
 
-if (!process.env.VERCEL) {
+const isVercelEnvironment = Boolean(process.env.VERCEL || process.env.NOW_REGION);
+if (!isVercelEnvironment) {
   startServer();
 }
 
