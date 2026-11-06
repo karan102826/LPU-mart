@@ -82,7 +82,7 @@ export const Navbar: React.FC = () => {
             >
               <Bot className="w-4 h-4 text-[#FF9F43]" />
               AI Assistant
-              <span className="text-[10px] text-[#FF9F43] bg-[#FF9F43]/10 px-1.5 py-0.5 rounded font-mono">₹5</span>
+              <span className="text-[10px] text-emerald-400 bg-emerald-500/10 px-1.5 py-0.5 rounded font-mono font-medium">Free</span>
             </button>
 
             <button
@@ -238,8 +238,8 @@ export const Navbar: React.FC = () => {
           >
             <div className="relative">
               <Bot className="w-5 h-5" />
-              <span className="absolute -top-1 -right-2 text-[8px] bg-[#FF9F43] text-black font-bold px-1 rounded-full">
-                ₹5
+              <span className="absolute -top-1 -right-2 text-[8px] bg-emerald-400 text-black font-bold px-1 rounded-full">
+                Free
               </span>
             </div>
             <span>AI Bot</span>

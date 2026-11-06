@@ -144,6 +144,177 @@ STRICT GOVERNANCE BOUNDARIES:
 5. RESPECTFUL & CONCISE: Respond in concise, friendly, student-focused language (1-3 paragraphs max). Always encourage safe transactions at approved campus meeting points (e.g., Uni-Mall, Central Library).
 `;
 
+// ==============================================================================
+// DISTRIBUTED & IN-MEMORY SLIDING WINDOW RATE LIMITER (Upstash Redis + Fallback)
+// ==============================================================================
+
+interface RateLimitResult {
+  allowed: boolean;
+  limit: number;
+  remaining: number;
+  resetSeconds: number;
+  provider: 'upstash-redis' | 'in-memory-sliding-window';
+}
+
+const inMemoryRateLimitStore = new Map<string, { count: number; resetAt: number }>();
+
+// Periodic cleanup of expired in-memory buckets
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of inMemoryRateLimitStore.entries()) {
+    if (now >= value.resetAt) {
+      inMemoryRateLimitStore.delete(key);
+    }
+  }
+}, 30000);
+
+async function checkRateLimit(
+  identifier: string,
+  prefix: string,
+  limit: number,
+  windowSeconds: number
+): Promise<RateLimitResult> {
+  const key = `ratelimit:${prefix}:${identifier}`;
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL?.trim();
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN?.trim();
+
+  // 1. If Upstash Redis is configured, use distributed REST pipeline
+  if (upstashUrl && upstashToken) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 1200);
+
+      const pipelineRes = await fetch(`${upstashUrl}/pipeline`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${upstashToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify([
+          ['INCR', key],
+          ['TTL', key],
+        ]),
+        signal: controller.signal,
+      });
+      clearTimeout(timeoutId);
+
+      if (pipelineRes.ok) {
+        const data = await pipelineRes.json();
+        const currentCount = Number(data[0]?.result || 1);
+        let ttl = Number(data[1]?.result);
+
+        if (currentCount === 1 || ttl < 0) {
+          fetch(`${upstashUrl}/expire/${key}/${windowSeconds}`, {
+            headers: { Authorization: `Bearer ${upstashToken}` },
+          }).catch(() => {});
+          ttl = windowSeconds;
+        }
+
+        const resetSeconds = ttl > 0 ? ttl : windowSeconds;
+        const allowed = currentCount <= limit;
+        const remaining = Math.max(0, limit - currentCount);
+
+        return {
+          allowed,
+          limit,
+          remaining,
+          resetSeconds,
+          provider: 'upstash-redis',
+        };
+      }
+    } catch (err: any) {
+      console.warn('Upstash Redis check error or timeout, falling back to in-memory window:', err?.message || err);
+    }
+  }
+
+  // 2. High-performance in-memory sliding window fallback
+  const now = Date.now();
+  const bucket = inMemoryRateLimitStore.get(key);
+
+  if (!bucket || now >= bucket.resetAt) {
+    inMemoryRateLimitStore.set(key, { count: 1, resetAt: now + windowSeconds * 1000 });
+    return {
+      allowed: true,
+      limit,
+      remaining: limit - 1,
+      resetSeconds: windowSeconds,
+      provider: 'in-memory-sliding-window',
+    };
+  }
+
+  bucket.count += 1;
+  const remaining = Math.max(0, limit - bucket.count);
+  const resetSeconds = Math.max(1, Math.ceil((bucket.resetAt - now) / 1000));
+  const allowed = bucket.count <= limit;
+
+  return {
+    allowed,
+    limit,
+    remaining,
+    resetSeconds,
+    provider: 'in-memory-sliding-window',
+  };
+}
+
+function createRateLimiter(options: {
+  prefix: string;
+  limit: number;
+  windowSeconds: number;
+  message?: string;
+}) {
+  return async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    const forwarded = req.headers['x-forwarded-for'];
+    const clientIp = typeof forwarded === 'string' ? forwarded.split(',')[0].trim() : req.socket.remoteAddress || 'unknown-client';
+    const authHeader = req.headers.authorization;
+    const userToken = authHeader ? authHeader.replace('Bearer ', '').trim() : '';
+    const identifier = userToken || clientIp;
+
+    const result = await checkRateLimit(identifier, options.prefix, options.limit, options.windowSeconds);
+
+    res.setHeader('X-RateLimit-Limit', result.limit.toString());
+    res.setHeader('X-RateLimit-Remaining', result.remaining.toString());
+    res.setHeader('X-RateLimit-Reset', result.resetSeconds.toString());
+    res.setHeader('X-RateLimit-Provider', result.provider);
+
+    if (!result.allowed) {
+      res.setHeader('Retry-After', result.resetSeconds.toString());
+      return res.status(429).json({
+        error: 'Too Many Requests',
+        message:
+          options.message ||
+          `Rate limit exceeded: Maximum ${options.limit} requests per ${options.windowSeconds}s. Please retry in ${result.resetSeconds}s.`,
+        retryAfterSeconds: result.resetSeconds,
+        limit: result.limit,
+        provider: result.provider,
+      });
+    }
+
+    next();
+  };
+}
+
+// Initialized Rate Limiters
+const aiRateLimiter = createRateLimiter({
+  prefix: 'ai_query',
+  limit: 20,
+  windowSeconds: 60,
+  message: 'Campus AI rate limit exceeded: Maximum 20 queries per minute to ensure fair shared campus access. Please retry shortly.',
+});
+
+const authRateLimiter = createRateLimiter({
+  prefix: 'auth_attempt',
+  limit: 10,
+  windowSeconds: 900,
+  message: 'Security Lockout: Too many authentication attempts from this client. Please wait 15 minutes before retrying.',
+});
+
+const generalApiRateLimiter = createRateLimiter({
+  prefix: 'general_api',
+  limit: 120,
+  windowSeconds: 60,
+  message: 'API rate limit exceeded: Maximum 120 requests per minute. Please reduce request frequency.',
+});
+
 // Helper: Authentication Middleware
 function authenticateUser(req: express.Request, res: express.Response, next: express.NextFunction) {
   const authHeader = req.headers.authorization;
@@ -163,6 +334,9 @@ function authenticateUser(req: express.Request, res: express.Response, next: exp
   next();
 }
 
+// Global General Rate Limiter for all API routes
+app.use('/api', generalApiRateLimiter);
+
 // ==============================================================================
 // 1. HEALTH & DIAGNOSTIC ENDPOINT
 // ==============================================================================
@@ -173,6 +347,15 @@ app.get('/api/health', (req, res) => {
     service: 'LPUmart Campus Marketplace API',
     supabaseConnected: isSupabaseConfigured,
     geminiConfigured: Boolean(process.env.GEMINI_API_KEY),
+    rateLimiting: {
+      enabled: true,
+      activeEngine: process.env.UPSTASH_REDIS_REST_URL ? 'Upstash Distributed Redis' : 'In-Memory Sliding Window',
+      policies: {
+        aiQueries: '20 requests / 60s',
+        authAttempts: '10 requests / 15m',
+        generalApi: '120 requests / 60s',
+      },
+    },
     metrics: {
       activeListings: dbListings.length,
       totalOrders: dbOrders.length,
@@ -241,7 +424,7 @@ app.post('/api/auth/register', (req, res) => {
 });
 
 // Google Authentication & Account Creation
-app.post('/api/auth/google', (req, res) => {
+app.post('/api/auth/google', authRateLimiter, (req, res) => {
   const { email, name, role, registrationNumber, hostel, googleId } = req.body;
 
   if (!email) {
@@ -296,7 +479,7 @@ app.post('/api/auth/google', (req, res) => {
 });
 
 // Login Student (Supports Institutional, Google, and Test Credentials)
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authRateLimiter, (req, res) => {
   const { email, password } = req.body;
 
   if (!email) {
@@ -340,7 +523,7 @@ app.post('/api/auth/login', (req, res) => {
 });
 
 // Dedicated Administrator Authentication Gateway
-app.post('/api/auth/admin-login', (req, res) => {
+app.post('/api/auth/admin-login', authRateLimiter, (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) {
     return res.status(400).json({ error: 'Administrator email and password are required.' });
@@ -972,7 +1155,7 @@ function checkGuardrails(sanitizedPrompt: string) {
   return { triggered: false, content: '' };
 }
 
-app.post('/api/ai/chat', async (req, res) => {
+app.post('/api/ai/chat', aiRateLimiter, async (req, res) => {
   const startTime = Date.now();
   const { sanitizedPrompt, safeContext, provider = 'gemini' } = req.body;
 
@@ -1026,7 +1209,7 @@ app.post('/api/ai/chat', async (req, res) => {
   });
 });
 
-app.post('/api/ai/stream', async (req, res) => {
+app.post('/api/ai/stream', aiRateLimiter, async (req, res) => {
   const { sanitizedPrompt, safeContext } = req.body;
 
   res.setHeader('Content-Type', 'text/event-stream');

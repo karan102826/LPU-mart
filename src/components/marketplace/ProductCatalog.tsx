@@ -105,7 +105,7 @@ export const ProductCatalog: React.FC = () => {
               className="px-5 py-2.5 rounded-lg bg-[#18181B] hover:bg-[#27272A] text-white border border-[#27272A] font-medium text-sm transition-colors flex items-center gap-2"
             >
               <Bot className="w-4 h-4 text-[#FF9F43]" />
-              Ask Campus AI (₹5)
+              Ask Campus AI (Free)
             </button>
           </div>
         </div>
@@ -303,11 +303,11 @@ export const ProductCatalog: React.FC = () => {
                         {/* Quick AI consultation button */}
                         <button
                           onClick={() => openAIModal(listing)}
-                          title="Ask AI about this item (₹5 session fee)"
+                          title="Ask AI about this item (Free)"
                           className="p-2 rounded-lg bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[#FF9F43] transition-colors flex items-center gap-1 text-xs"
                         >
                           <Bot className="w-4 h-4" />
-                          <span className="font-mono text-[10px]">₹5</span>
+                          <span className="font-mono text-[10px] text-emerald-400">Free</span>
                         </button>
 
                         {/* View & Purchase */}

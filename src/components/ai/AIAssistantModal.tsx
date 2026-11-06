@@ -6,7 +6,6 @@ import {
   ShieldAlert,
   ShieldCheck,
   Sparkles,
-  CreditCard,
   AlertTriangle,
   RotateCcw,
   CheckCircle2,
@@ -26,8 +25,6 @@ export const AIAssistantModal: React.FC = () => {
     logSecurityEvent,
   } = useMarketplace();
 
-  // Fee acceptance gate
-  const [feeAccepted, setFeeAccepted] = useState(false);
   const [messages, setMessages] = useState<AIMessage[]>([]);
   const [inputText, setInputText] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -38,7 +35,9 @@ export const AIAssistantModal: React.FC = () => {
 
   useEffect(() => {
     if (isAIModalOpen) {
-      setFeeAccepted(user.role === 'admin'); // Admins bypass student item query fee
+      if (activeListingForAI) {
+        recordAIFee(activeListingForAI.id);
+      }
       
       let welcomeContent = '';
       if (user.role === 'admin') {
@@ -70,11 +69,6 @@ export const AIAssistantModal: React.FC = () => {
   }, [messages]);
 
   if (!isAIModalOpen) return null;
-
-  const handleAcceptFeeAndStart = async () => {
-    await recordAIFee(activeListingForAI?.id);
-    setFeeAccepted(true);
-  };
 
   const handleSendMessage = async (textToSend?: string) => {
     const rawInput = textToSend || inputText;
@@ -208,62 +202,7 @@ export const AIAssistantModal: React.FC = () => {
           </div>
         </div>
 
-        {/* FEE CONSENT GATE: Mandatory ₹5 Engagement Billing Disclosure */}
-        {!feeAccepted && activeListingForAI ? (
-          <div className="flex-1 p-6 md:p-8 flex flex-col items-center justify-center text-center space-y-6">
-            <div className="w-16 h-16 rounded-2xl bg-[#FF6B00]/10 border border-[#FF6B00]/30 flex items-center justify-center text-[#FF6B00]">
-              <CreditCard className="w-8 h-8" />
-            </div>
-
-            <div className="space-y-2 max-w-md">
-              <h4 className="text-xl font-bold text-white">AI Query Session Fee</h4>
-              <p className="text-xs text-[#A1A1AA] leading-relaxed">
-                As per LPUmart platform policy (§4.2), an engagement fee of{' '}
-                <span className="text-white font-bold font-mono">₹5 per item-query session</span> is
-                recorded. This supports real-time deterministic PII deflection and zero-trust
-                database isolation.
-              </p>
-            </div>
-
-            <div className="w-full max-w-sm p-4 rounded-xl bg-[#09090B] border border-[#27272A] text-left text-xs space-y-2">
-              <div className="flex justify-between text-[#A1A1AA]">
-                <span>Target Listing:</span>
-                <span className="text-white font-medium truncate max-w-[180px]">
-                  {activeListingForAI.title}
-                </span>
-              </div>
-              <div className="flex justify-between text-[#A1A1AA]">
-                <span>Session Fee:</span>
-                <span className="text-[#FF6B00] font-bold font-mono">₹5.00</span>
-              </div>
-              <div className="flex justify-between text-[#A1A1AA]">
-                <span>Billing Mode:</span>
-                <span className="text-white font-mono">Recorded to Student Ledger</span>
-              </div>
-              <div className="flex justify-between text-[#A1A1AA]">
-                <span>Idempotency:</span>
-                <span className="text-emerald-400 font-mono">Protected</span>
-              </div>
-            </div>
-
-            <div className="flex gap-3 w-full max-w-sm">
-              <button
-                onClick={closeAIModal}
-                className="flex-1 py-2.5 rounded-xl bg-[#18181B] hover:bg-[#27272A] text-[#A1A1AA] text-xs font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAcceptFeeAndStart}
-                className="flex-1 py-2.5 rounded-xl bg-[#FF6B00] hover:bg-[#FF8533] text-black text-xs font-bold shadow-lg"
-              >
-                Accept & Start (₹5)
-              </button>
-            </div>
-          </div>
-        ) : (
-          <>
-            {/* Live Deflection Monitor Bar */}
+        {/* Live Deflection Monitor Bar */}
             <div className="px-4 py-2 bg-[#09090B]/60 border-b border-[#27272A] text-[11px] flex items-center justify-between text-[#A1A1AA]">
               <div className="flex items-center gap-1.5">
                 <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
@@ -419,8 +358,6 @@ export const AIAssistantModal: React.FC = () => {
                 <Send className="w-4 h-4" />
               </button>
             </div>
-          </>
-        )}
       </div>
     </div>
   );

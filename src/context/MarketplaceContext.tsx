@@ -232,7 +232,7 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
   };
 
   const recordAIFee = async (listingId?: string): Promise<boolean> => {
-    const fee = 5; // Flat ₹5 per session
+    const fee = 0; // 100% Free Campus AI for all students
     const sessionId = `ses_${Date.now()}`;
     const newSession: AISession = {
       id: sessionId,
@@ -240,18 +240,14 @@ export const MarketplaceProvider: React.FC<{ children: React.ReactNode }> = ({ c
       listingTitle: listings.find((l) => l.id === listingId)?.title,
       userId: user.id,
       feeAmount: fee,
-      feeStatus: 'RECORDED',
+      feeStatus: 'SETTLED',
       idempotencyKey: `idemp_${user.id}_${listingId || 'general'}_${new Date().toDateString()}`,
       createdAt: new Date().toISOString(),
       messages: [],
     };
 
     setAiSessions((prev) => [newSession, ...prev]);
-    setUser((prev) => ({
-      ...prev,
-      aiFeesAccumulated: prev.aiFeesAccumulated + fee,
-      walletBalance: Math.max(0, prev.walletBalance - fee),
-    }));
+    // Campus AI is 100% free — no wallet balance deduction
 
     return true;
   };

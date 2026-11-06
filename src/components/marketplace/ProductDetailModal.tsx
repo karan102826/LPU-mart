@@ -277,7 +277,7 @@ export const ProductDetailModal: React.FC<ProductDetailModalProps> = ({
                 className="w-full py-2.5 rounded-xl bg-[#18181B] hover:bg-[#27272A] border border-[#27272A] text-[#FF9F43] text-xs font-medium transition-colors flex items-center justify-center gap-2"
               >
                 <Bot className="w-4 h-4" />
-                Ask Governed AI about this item (₹5 Session)
+                Ask Governed AI about this item (Free)
               </button>
             </div>
           </div>
